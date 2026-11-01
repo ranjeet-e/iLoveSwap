@@ -16,6 +16,7 @@ import { parseAndBifurcatePdf } from './utils/pdfParser';
 import { applyPdfModifications } from './utils/pdfModifier';
 import { exportToDocx } from './utils/docxExporter';
 import { clonePdfBytes } from './utils/pdfSetup';
+import { applyFixedToSections } from './utils/identityHelper';
 
 export function computeDocName(sections, originalName) {
   let nameVal = 'Student';
@@ -71,30 +72,6 @@ export default function App() {
     setCurrentPage(1);
   }, [activeDocIndex]);
 
-  // Helper to map fixed identity fields onto personal tags
-  const applyFixedToSections = (secList, fixed) => {
-    if (!fixed || !fixed.name || !secList?.personalTags) return secList;
-    const updatedTags = secList.personalTags.map((tag) => {
-      const k = (tag.key || '').toLowerCase();
-      const l = (tag.label || '').toLowerCase();
-      let newVal = tag.currentValue;
-
-      if (k.includes('name') || l.includes('name')) {
-        if (fixed.name) newVal = fixed.name;
-      } else if (k.includes('roll') || l.includes('roll')) {
-        if (fixed.rollNo) newVal = fixed.rollNo;
-      } else if (k.includes('batch') || l.includes('batch')) {
-        if (fixed.batch) newVal = fixed.batch;
-      } else if (k.includes('div') || k.includes('class') || l.includes('div')) {
-        if (fixed.division) newVal = fixed.division;
-      } else if (k.includes('prn') || l.includes('prn') || k.includes('sap')) {
-        if (fixed.prn) newVal = fixed.prn;
-      }
-      return { ...tag, currentValue: newVal };
-    });
-
-    return { ...secList, personalTags: updatedTags };
-  };
 
   // Process a single file into a document object
   const processFileToDoc = async (file, currentFixed) => {

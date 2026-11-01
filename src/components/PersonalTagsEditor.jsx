@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, Check, ArrowRight } from 'lucide-react';
+import { applyFixedToSections } from '../utils/identityHelper';
 
 export default function PersonalTagsEditor({
   personalTags,
@@ -22,21 +23,9 @@ export default function PersonalTagsEditor({
       return;
     }
 
-    personalTags.forEach((tag) => {
-      const key = (tag.key || '').toLowerCase();
-      const label = (tag.label || '').toLowerCase();
-
-      if (key.includes('name') || label.includes('name')) {
-        if (fixedIdentity.name) onTagChange(tag.id, fixedIdentity.name);
-      } else if (key.includes('roll') || label.includes('roll')) {
-        if (fixedIdentity.rollNo) onTagChange(tag.id, fixedIdentity.rollNo);
-      } else if (key.includes('batch') || label.includes('batch')) {
-        if (fixedIdentity.batch) onTagChange(tag.id, fixedIdentity.batch);
-      } else if (key.includes('division') || key.includes('class') || label.includes('div')) {
-        if (fixedIdentity.division) onTagChange(tag.id, fixedIdentity.division);
-      } else if (key.includes('prn') || label.includes('prn') || key.includes('sap')) {
-        if (fixedIdentity.prn) onTagChange(tag.id, fixedIdentity.prn);
-      }
+    const updated = applyFixedToSections({ personalTags }, fixedIdentity);
+    updated.personalTags.forEach((tag) => {
+      onTagChange(tag.id, tag.currentValue);
     });
 
     onApplyChanges?.();

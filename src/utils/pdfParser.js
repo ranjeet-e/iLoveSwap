@@ -3,16 +3,18 @@ import { pdfjsLib, clonePdfBytes } from './pdfSetup.js';
 /**
  * Common patterns for Indian Engineering / University Lab Reports & Academic documents
  */
-const TAG_REGEXES = [
-  { key: 'name', label: 'Name', regex: /^(?:student\s+)?name\s*[:\-]\s*(.*)$/i },
-  { key: 'rollNo', label: 'Roll No', regex: /^(?:roll\s*(?:no|number)?)\s*[:\-]\s*(.*)$/i },
-  { key: 'batch', label: 'Batch', regex: /^batch\s*[:\-]\s*(.*)$/i },
-  { key: 'division', label: 'Division / Class', regex: /^(?:division|div|class)\s*[:\-]\s*(.*)$/i },
-  { key: 'prn', label: 'PRN / SAP ID', regex: /^(?:prn(?:\s*no)?|sap\s*id|uin|reg(?:istration)?\s*no)\s*[:\-]\s*(.*)$/i },
-  { key: 'expNo', label: 'Experiment No', regex: /^(?:experiment|exp)\s*(?:no\.?|number)?\s*[:\-–]\s*(.*)$/i },
-  { key: 'date', label: 'Date', regex: /^(?:date(?:\s*of\s*submission)?)\s*[:\-]\s*(.*)$/i },
-  { key: 'academicYear', label: 'Academic Year', regex: /^(?:a\.?y\.?|academic\s*year)\s*[:\-]\s*(.*)$/i },
-  { key: 'subject', label: 'Subject / Course', regex: /^(?:subject|course)\s*[:\-]\s*(.*)$/i },
+export const TAG_REGEXES = [
+  { key: 'name', label: 'Name', regex: /^(?:student\s+)?name\s*[:\-–.]?\s*(.*)$/i },
+  { key: 'composite_class_roll', label: 'Class / Roll No / Batch', regex: /^(?:(?:class|division|div\.?)\s*(?:\/|&|\band\b)\s*roll\s*(?:no\.?|number)?|roll\s*(?:no\.?|number)?\s*(?:\/|&|\band\b)\s*(?:class|division|div\.?))\s*[:\-–.]?\s*(.*)$/i },
+  { key: 'composite_roll_batch', label: 'Roll No / Batch', regex: /^(?:roll\s*(?:no\.?|number)?\s*(?:\/|&|\band\b)\s*batch|batch\s*(?:\/|&|\band\b)\s*roll\s*(?:no\.?|number)?)\s*[:\-–.]?\s*(.*)$/i },
+  { key: 'rollNo', label: 'Roll No', regex: /^(?:roll\s*(?:no\.?|number)?)\s*[:\-–.]?\s*(.*)$/i },
+  { key: 'batch', label: 'Batch', regex: /^batch\s*[:\-–.]?\s*(.*)$/i },
+  { key: 'division', label: 'Division / Class', regex: /^(?:division|div\.?|class)\s*[:\-–.]?\s*(.*)$/i },
+  { key: 'prn', label: 'PRN / SAP ID', regex: /^(?:p\.?r\.?n\.?(?:\s*no\.?)?|sap\s*id\.?|uin\.?|reg(?:istration)?\.?\s*(?:no\.?)?)\s*[:\-–.]?\s*(.*)$/i },
+  { key: 'expNo', label: 'Experiment No', regex: /^(?:experiment|exp)\s*(?:no\.?|number)?\s*[:\-–.]?\s*(.*)$/i },
+  { key: 'date', label: 'Date', regex: /^(?:date(?:\s*of\s*submission)?)\s*[:\-–.]?\s*(.*)$/i },
+  { key: 'academicYear', label: 'Academic Year', regex: /^(?:a\.?y\.?|academic\s*year)\s*[:\-–.]?\s*(.*)$/i },
+  { key: 'subject', label: 'Subject / Course', regex: /^(?:subject|course)\s*[:\-–.]?\s*(.*)$/i },
 ];
 
 /**
@@ -88,16 +90,43 @@ export async function parseAndBifurcatePdf(inputData) {
 
   // 1. Detect Personal Identity Tags (Name, Roll No, Batch, Division, PRN, etc.)
   for (const item of allExtractedItems) {
+    if (matchedItemIds.has(item.id)) continue;
     const trimmed = item.str.trim();
+
     for (const tagDef of TAG_REGEXES) {
       const match = trimmed.match(tagDef.regex);
       if (match) {
         matchedItemIds.add(item.id);
-        const prefix = trimmed.substring(0, trimmed.indexOf(match[1]));
-        const originalVal = match[1].trim();
 
-        // Calculate approximate x offset for the value part
-        const prefixWidth = (prefix.length / (trimmed.length || 1)) * item.width;
+        let prefix = trimmed;
+        let originalVal = match[1] ? match[1].trim() : '';
+        let fullWidth = item.width;
+        let fullOriginalText = item.str;
+
+        if (match[1] && trimmed.indexOf(match[1]) !== -1) {
+          prefix = trimmed.substring(0, trimmed.indexOf(match[1]));
+        }
+
+        // If the value was empty in this text chunk, look for adjacent text item on the same horizontal line
+        if (!originalVal) {
+          const adjacent = allExtractedItems.find(
+            (it) =>
+              it.pageNum === item.pageNum &&
+              it.id !== item.id &&
+              !matchedItemIds.has(it.id) &&
+              Math.abs(it.y - item.y) <= 4 &&
+              it.x >= item.x + item.width - 15
+          );
+          if (adjacent && adjacent.str.trim()) {
+            originalVal = adjacent.str.trim();
+            matchedItemIds.add(adjacent.id);
+            prefix = item.str.trim() + ' ';
+            fullWidth = Math.max(item.width, adjacent.x + adjacent.width - item.x);
+            fullOriginalText = `${item.str.trim()} ${adjacent.str.trim()}`;
+          }
+        }
+
+        const prefixWidth = (prefix.length / ((prefix.length + originalVal.length) || 1)) * fullWidth;
 
         personalTags.push({
           id: `tag_${tagDef.key}_${item.id}`,
@@ -108,17 +137,17 @@ export async function parseAndBifurcatePdf(inputData) {
           prefix: prefix,
           originalValue: originalVal,
           currentValue: originalVal,
-          fullOriginalText: item.str,
+          fullOriginalText: fullOriginalText,
           pageNum: item.pageNum,
           pageIndex: item.pageIndex,
           x: item.x,
           y: item.y,
-          width: item.width,
+          width: fullWidth,
           height: item.height,
           fontSize: item.fontSize,
           fontName: item.fontName,
           valueX: item.x + prefixWidth,
-          valueWidth: Math.max(item.width - prefixWidth, 60),
+          valueWidth: Math.max(fullWidth - prefixWidth, 60),
         });
         break;
       }
