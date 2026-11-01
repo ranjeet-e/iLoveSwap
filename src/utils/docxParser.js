@@ -2,6 +2,7 @@ import JSZip from 'jszip';
 import mammoth from 'mammoth';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { TAG_REGEXES } from './pdfParser.js';
+import { sanitizeForPdf } from './pdfSetup.js';
 
 /**
  * Checks whether a file or filename is a Word document (.docx or .doc)
@@ -57,7 +58,9 @@ export async function renderSectionsToPdf(sections) {
       return null;
     }
 
-    currentPage.drawText(cleanText, {
+    const safeText = sanitizeForPdf(cleanText, font);
+
+    currentPage.drawText(safeText, {
       x: marginX,
       y: currentY,
       size: fontSize,
@@ -210,12 +213,47 @@ export async function renderSectionsToPdf(sections) {
  * Parses and bifurcates a Word document (.docx) into structured sections.
  */
 export async function parseAndBifurcateDocx(arrayBuffer, fileName = 'document.docx') {
-  // 1. Extract raw text with mammoth
-  const rawResult = await mammoth.extractRawText({ arrayBuffer });
-  const rawLines = rawResult.value
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter((l) => l.length > 0);
+  let rawLines = [];
+
+  // 1. Try extracting raw text with mammoth
+  try {
+    const rawResult = await (typeof window !== 'undefined'
+      ? mammoth.extractRawText({ arrayBuffer })
+      : mammoth.extractRawText({ buffer: Buffer.from(arrayBuffer) }));
+    rawLines = (rawResult.value || '')
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
+  } catch (err) {
+    console.warn('Mammoth text extraction note:', err);
+  }
+
+  // 2. Fallback: if mammoth returned no text, parse word/document.xml with JSZip
+  if (rawLines.length === 0) {
+    try {
+      const zip = await JSZip.loadAsync(arrayBuffer);
+      const xmlFile = zip.file('word/document.xml');
+      if (xmlFile) {
+        const xml = await xmlFile.async('text');
+        const pRegex = /<w:p(?: [^>]*)?>([\s\S]*?)<\/w:p>/g;
+        let pMatch;
+        while ((pMatch = pRegex.exec(xml)) !== null) {
+          const pXml = pMatch[1];
+          const tRegex = /<w:t(?: [^>]*)?>([\s\S]*?)<\/w:t>/g;
+          let tMatch;
+          let pText = '';
+          while ((tMatch = tRegex.exec(pXml)) !== null) {
+            pText += tMatch[1];
+          }
+          if (pText.trim()) {
+            rawLines.push(pText.trim());
+          }
+        }
+      }
+    } catch (e) {
+      console.error('JSZip fallback extraction error:', e);
+    }
+  }
 
   const personalTags = [];
   const headerLines = [];

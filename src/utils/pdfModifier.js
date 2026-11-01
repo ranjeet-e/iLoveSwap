@@ -1,5 +1,5 @@
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
-import { clonePdfBytes } from './pdfSetup.js';
+import { clonePdfBytes, sanitizeForPdf } from './pdfSetup.js';
 
 /**
  * Modifies an existing PDF buffer by applying edited personal tags and section text changes.
@@ -67,7 +67,8 @@ export async function applyPdfModifications(originalPdfBuffer, sections, customR
 
       // Draw updated text if not removed
       if (!isRemoved && newFullText.trim()) {
-        page.drawText(newFullText, {
+        const safeText = sanitizeForPdf(newFullText, font);
+        page.drawText(safeText, {
           x: tag.x,
           y: tag.y,
           size: fontSize,
@@ -108,7 +109,8 @@ export async function applyPdfModifications(originalPdfBuffer, sections, customR
 
       // Draw replacement text if not removed
       if (!isRemoved && targetText.trim()) {
-        page.drawText(targetText, {
+        const safeText = sanitizeForPdf(targetText, font);
+        page.drawText(safeText, {
           x: item.x,
           y: item.y,
           size: fontSize,
@@ -159,7 +161,8 @@ export async function applyPdfModifications(originalPdfBuffer, sections, customR
     });
 
     if (custom.replaceWith && custom.replaceWith.trim()) {
-      targetPage.drawText(custom.replaceWith, {
+      const safeText = sanitizeForPdf(custom.replaceWith, helveticaBold);
+      targetPage.drawText(safeText, {
         x,
         y,
         size: fontSize,
