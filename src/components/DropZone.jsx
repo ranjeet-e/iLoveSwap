@@ -1,10 +1,11 @@
 import React, { useRef, useState } from 'react';
-import { Upload, FileText } from 'lucide-react';
+import { Upload, Files } from 'lucide-react';
 
 export default function DropZone({
-  onFileSelected,
+  onFilesSelected,
   onLoadSample,
   isLoading,
+  loadingStatus,
   fixedIdentity,
   onOpenFixedIdentityModal,
 }) {
@@ -25,16 +26,23 @@ export default function DropZone({
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const file = e.dataTransfer.files[0];
-      if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
-        onFileSelected(file);
+      const pdfs = Array.from(e.dataTransfer.files).filter(
+        (f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')
+      );
+      if (pdfs.length > 0) {
+        onFilesSelected(pdfs);
       }
     }
   };
 
   const handleFileInputChange = (e) => {
     if (e.target.files && e.target.files.length > 0) {
-      onFileSelected(e.target.files[0]);
+      const pdfs = Array.from(e.target.files).filter(
+        (f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')
+      );
+      if (pdfs.length > 0) {
+        onFilesSelected(pdfs);
+      }
     }
   };
 
@@ -45,7 +53,7 @@ export default function DropZone({
           PDF Section & Identity Editor
         </h1>
         <p className="mt-2 text-sm text-gray-500">
-          Upload a lab manual or report to extract sections, edit personal tags, and export.
+          Upload one or multiple PDFs to batch-extract sections, swap student details, and export.
         </p>
       </div>
 
@@ -76,6 +84,7 @@ export default function DropZone({
           ref={fileInputRef}
           type="file"
           accept="application/pdf"
+          multiple
           className="hidden"
           onChange={handleFileInputChange}
         />
@@ -83,10 +92,10 @@ export default function DropZone({
         <div className="flex flex-col items-center justify-center">
           <Upload className="w-8 h-8 text-gray-400 mb-3" />
           <p className="text-sm font-medium text-gray-800">
-            Drag and drop your PDF here
+            Drag and drop your PDF(s) here
           </p>
           <p className="text-xs text-gray-500 mt-1 mb-5">
-            Supported format: PDF
+            Single or multiple PDF files supported
           </p>
 
           <div className="flex items-center gap-3">
@@ -96,7 +105,7 @@ export default function DropZone({
               type="button"
               className="px-4 py-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded transition-colors"
             >
-              Select PDF
+              Select PDF(s)
             </button>
 
             <span className="text-xs text-gray-400">or</span>
@@ -113,7 +122,7 @@ export default function DropZone({
 
           {isLoading && (
             <p className="mt-4 text-xs text-red-600 font-medium">
-              Processing document...
+              {loadingStatus || 'Processing documents...'}
             </p>
           )}
         </div>

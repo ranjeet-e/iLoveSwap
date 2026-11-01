@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { saveAs } from 'file-saver';
+import JSZip from 'jszip';
 import Navbar from './components/Navbar';
 import DropZone from './components/DropZone';
+import DocumentTabs from './components/DocumentTabs';
 import PersonalTagsEditor from './components/PersonalTagsEditor';
 import SectionList from './components/SectionList';
 import PdfViewer from './components/PdfViewer';
@@ -15,25 +17,59 @@ import { applyPdfModifications } from './utils/pdfModifier';
 import { exportToDocx } from './utils/docxExporter';
 import { clonePdfBytes } from './utils/pdfSetup';
 
-export default function App() {
-  const [pdfBuffer, setPdfBuffer] = useState(null);
-  const [modifiedPdfBuffer, setModifiedPdfBuffer] = useState(null);
-  const [fileName, setFileName] = useState('');
-  const [numPages, setNumPages] = useState(1);
-  const [currentPage, setCurrentPage] = useState(1);
+export function computeDocName(sections, originalName) {
+  let nameVal = 'Student';
+  let rollVal = 'Roll';
+  let expVal = '';
 
-  const [sections, setSections] = useState(null);
-  const [customReplacements, setCustomReplacements] = useState([]);
+  if (sections?.personalTags) {
+    sections.personalTags.forEach((tag) => {
+      const k = (tag.key || tag.label || '').toLowerCase();
+      if (k.includes('name') && tag.currentValue) nameVal = tag.currentValue.replace(/\s+/g, '_');
+      if (k.includes('roll') && tag.currentValue) rollVal = tag.currentValue.replace(/\s+/g, '');
+      if (k.includes('exp') && tag.currentValue) expVal = tag.currentValue.replace(/\s+/g, '_');
+    });
+  }
+
+  if (expVal) {
+    return `${expVal}_Roll${rollVal}_${nameVal}.pdf`;
+  }
+  if (originalName) {
+    const base = originalName.replace(/\.pdf$/i, '');
+    return `${base}_Roll${rollVal}_${nameVal}.pdf`;
+  }
+  return `Document_Roll${rollVal}_${nameVal}.pdf`;
+}
+
+export default function App() {
+  const [documents, setDocuments] = useState([]);
+  const [activeDocIndex, setActiveDocIndex] = useState(0);
+
+  const [currentPage, setCurrentPage] = useState(1);
   const [highlightedItemId, setHighlightedItemId] = useState(null);
 
   const [fixedIdentity, setFixedIdentity] = useState(() => getSavedFixedIdentity());
   const [showFixedIdentityModal, setShowFixedIdentityModal] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState('');
   const [isExporting, setIsExporting] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
   const [celebrationChanges, setCelebrationChanges] = useState([]);
   const [showGuideModal, setShowGuideModal] = useState(false);
+
+  const activeDoc = documents[activeDocIndex] || null;
+  const pdfBuffer = activeDoc?.originalBytes || null;
+  const modifiedPdfBuffer = activeDoc?.modifiedBytes || null;
+  const fileName = activeDoc?.fileName || '';
+  const numPages = activeDoc?.numPages || 1;
+  const sections = activeDoc?.sections || null;
+  const customReplacements = activeDoc?.customReplacements || [];
+
+  // Reset current page when switching active document
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeDocIndex]);
 
   // Helper to map fixed identity fields onto personal tags
   const applyFixedToSections = (secList, fixed) => {
@@ -60,164 +96,262 @@ export default function App() {
     return { ...secList, personalTags: updatedTags };
   };
 
+  // Process a single file into a document object
+  const processFileToDoc = async (file, currentFixed) => {
+    const arrayBuffer = await file.arrayBuffer();
+    const masterBytes = new Uint8Array(arrayBuffer);
+    const parsed = await parseAndBifurcatePdf(clonePdfBytes(masterBytes));
+
+    let finalSections = parsed.sections;
+    let finalModBytes = clonePdfBytes(masterBytes);
+
+    if (currentFixed?.name && currentFixed.autoApply !== false) {
+      finalSections = applyFixedToSections(parsed.sections, currentFixed);
+      try {
+        const mod = await applyPdfModifications(clonePdfBytes(masterBytes), finalSections, []);
+        finalModBytes = clonePdfBytes(mod);
+      } catch (err) {
+        console.error('Error applying initial modifications to ' + file.name, err);
+      }
+    }
+
+    return {
+      id: `doc_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+      fileName: file.name,
+      originalBytes: clonePdfBytes(masterBytes),
+      modifiedBytes: finalModBytes,
+      numPages: parsed.numPages,
+      sections: finalSections,
+      customReplacements: [],
+    };
+  };
+
   // Load sample lab manual
   const loadSamplePdf = async () => {
     try {
       setIsLoading(true);
+      setLoadingStatus('Loading sample lab manual...');
       const res = await fetch('/sample_lab_manual.pdf');
       const arrayBuffer = await res.arrayBuffer();
       const masterBytes = new Uint8Array(arrayBuffer);
 
-      setFileName('Shah_Anchor_Lab_Manual_Exp1.pdf');
-      setPdfBuffer(clonePdfBytes(masterBytes));
-      setModifiedPdfBuffer(clonePdfBytes(masterBytes));
-
       const parsed = await parseAndBifurcatePdf(clonePdfBytes(masterBytes));
       let finalSections = parsed.sections;
+      let finalModBytes = clonePdfBytes(masterBytes);
 
-      // Auto-apply Fixed Identity if present and enabled
       const currentFixed = fixedIdentity || getSavedFixedIdentity();
       if (currentFixed?.name && currentFixed.autoApply !== false) {
         finalSections = applyFixedToSections(parsed.sections, currentFixed);
         try {
           const modBytes = await applyPdfModifications(clonePdfBytes(masterBytes), finalSections);
-          setModifiedPdfBuffer(clonePdfBytes(modBytes));
+          finalModBytes = clonePdfBytes(modBytes);
         } catch (e) {
           console.error(e);
         }
       }
 
-      setNumPages(parsed.numPages);
-      setSections(finalSections);
+      const sampleDoc = {
+        id: `doc_sample_${Date.now()}`,
+        fileName: 'Shah_Anchor_Lab_Manual_Exp1.pdf',
+        originalBytes: clonePdfBytes(masterBytes),
+        modifiedBytes: finalModBytes,
+        numPages: parsed.numPages,
+        sections: finalSections,
+        customReplacements: [],
+      };
+
+      setDocuments([sampleDoc]);
+      setActiveDocIndex(0);
       setCurrentPage(1);
     } catch (err) {
       console.error('Error loading sample pdf:', err);
       alert('Could not load sample PDF: ' + (err.message || 'Unknown error'));
     } finally {
       setIsLoading(false);
+      setLoadingStatus('');
     }
   };
 
-  // Process uploaded PDF
-  const handleFileSelected = async (file) => {
+  // Process multiple uploaded PDFs
+  const handleFilesSelected = async (files) => {
+    if (!files || files.length === 0) return;
     try {
       setIsLoading(true);
-      setFileName(file.name);
-      const arrayBuffer = await file.arrayBuffer();
-      const masterBytes = new Uint8Array(arrayBuffer);
-
-      setPdfBuffer(clonePdfBytes(masterBytes));
-      setModifiedPdfBuffer(clonePdfBytes(masterBytes));
-
-      const parsed = await parseAndBifurcatePdf(clonePdfBytes(masterBytes));
-      let finalSections = parsed.sections;
-
-      // Auto-apply Fixed Identity if present and enabled
       const currentFixed = fixedIdentity || getSavedFixedIdentity();
-      if (currentFixed?.name && currentFixed.autoApply !== false) {
-        finalSections = applyFixedToSections(parsed.sections, currentFixed);
-        try {
-          const modBytes = await applyPdfModifications(clonePdfBytes(masterBytes), finalSections);
-          setModifiedPdfBuffer(clonePdfBytes(modBytes));
-        } catch (e) {
-          console.error(e);
-        }
+      const newDocs = [];
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        setLoadingStatus(`Processing ${i + 1} of ${files.length}: ${file.name}`);
+        const doc = await processFileToDoc(file, currentFixed);
+        newDocs.push(doc);
       }
 
-      setNumPages(parsed.numPages);
-      setSections(finalSections);
+      setDocuments(newDocs);
+      setActiveDocIndex(0);
       setCurrentPage(1);
     } catch (err) {
-      console.error('Error parsing uploaded pdf:', err);
-      alert('Failed to parse PDF document: ' + (err.message || 'Please verify it is a valid PDF.'));
+      console.error('Error parsing uploaded pdfs:', err);
+      alert('Failed to parse document: ' + (err.message || 'Please verify valid PDF files.'));
     } finally {
       setIsLoading(false);
+      setLoadingStatus('');
     }
   };
 
-  // Update a personal identity tag
-  const handleTagChange = (tagId, newValue) => {
-    setSections((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        personalTags: prev.personalTags.map((t) =>
-          t.id === tagId ? { ...t, currentValue: newValue } : t
-        ),
-      };
+  // Add more files to existing document list
+  const handleAddFiles = async (files) => {
+    if (!files || files.length === 0) return;
+    try {
+      setIsLoading(true);
+      const currentFixed = fixedIdentity || getSavedFixedIdentity();
+      const appendedDocs = [];
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        setLoadingStatus(`Adding ${i + 1} of ${files.length}: ${file.name}`);
+        const doc = await processFileToDoc(file, currentFixed);
+        appendedDocs.push(doc);
+      }
+
+      setDocuments((prev) => [...prev, ...appendedDocs]);
+    } catch (err) {
+      console.error('Error adding documents:', err);
+      alert('Failed to add document: ' + err.message);
+    } finally {
+      setIsLoading(false);
+      setLoadingStatus('');
+    }
+  };
+
+  // Remove a document from the list
+  const handleRemoveDoc = (indexToRemove) => {
+    setDocuments((prev) => {
+      const updated = prev.filter((_, idx) => idx !== indexToRemove);
+      if (updated.length === 0) {
+        setActiveDocIndex(0);
+        return [];
+      }
+      if (activeDocIndex >= updated.length) {
+        setActiveDocIndex(updated.length - 1);
+      } else if (indexToRemove < activeDocIndex) {
+        setActiveDocIndex((curr) => curr - 1);
+      }
+      return updated;
     });
   };
 
-  // Add custom personal tag
+  // Update a personal identity tag for active document
+  const handleTagChange = (tagId, newValue) => {
+    setDocuments((prev) =>
+      prev.map((doc, idx) => {
+        if (idx !== activeDocIndex || !doc.sections) return doc;
+        return {
+          ...doc,
+          sections: {
+            ...doc.sections,
+            personalTags: doc.sections.personalTags.map((t) =>
+              t.id === tagId ? { ...t, currentValue: newValue } : t
+            ),
+          },
+        };
+      })
+    );
+  };
+
+  // Add custom personal tag to active document
   const handleAddTag = (newTag) => {
     const id = `custom_tag_${Date.now()}`;
-    setSections((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        personalTags: [
-          ...prev.personalTags,
-          {
-            id,
-            itemId: id,
-            category: 'personal',
-            key: newTag.key,
-            label: newTag.label,
-            prefix: newTag.prefix,
-            originalValue: newTag.originalValue,
-            currentValue: newTag.currentValue,
-            fullOriginalText: `${newTag.prefix}${newTag.currentValue}`,
-            pageNum: 1,
-            pageIndex: 0,
-            x: 70,
-            y: 500,
-            width: 150,
-            height: 14,
-            fontSize: 12,
-            isCustom: true,
+    setDocuments((prev) =>
+      prev.map((doc, idx) => {
+        if (idx !== activeDocIndex || !doc.sections) return doc;
+        return {
+          ...doc,
+          sections: {
+            ...doc.sections,
+            personalTags: [
+              ...doc.sections.personalTags,
+              {
+                id,
+                itemId: id,
+                category: 'personal',
+                key: newTag.key,
+                label: newTag.label,
+                prefix: newTag.prefix,
+                originalValue: newTag.originalValue,
+                currentValue: newTag.currentValue,
+                fullOriginalText: `${newTag.prefix}${newTag.currentValue}`,
+                pageNum: 1,
+                pageIndex: 0,
+                x: 70,
+                y: 500,
+                width: 150,
+                height: 14,
+                fontSize: 12,
+                isCustom: true,
+              },
+            ],
           },
-        ],
-      };
-    });
+        };
+      })
+    );
   };
 
-  // Remove custom tag
+  // Remove custom tag from active document
   const handleRemoveTag = (tagId) => {
-    setSections((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        personalTags: prev.personalTags.filter((t) => t.id !== tagId),
-      };
-    });
+    setDocuments((prev) =>
+      prev.map((doc, idx) => {
+        if (idx !== activeDocIndex || !doc.sections) return doc;
+        return {
+          ...doc,
+          sections: {
+            ...doc.sections,
+            personalTags: doc.sections.personalTags.filter((t) => t.id !== tagId),
+          },
+        };
+      })
+    );
   };
 
-  // Update any section line text
+  // Update any section line text for active document
   const handleSectionTextChange = (itemId, newText) => {
-    setSections((prev) => {
-      if (!prev) return prev;
-      const updateList = (list) =>
-        list?.map((item) => (item.id === itemId ? { ...item, currentText: newText } : item)) || [];
+    setDocuments((prev) =>
+      prev.map((doc, idx) => {
+        if (idx !== activeDocIndex || !doc.sections) return doc;
+        const updateList = (list) =>
+          list?.map((item) => (item.id === itemId ? { ...item, currentText: newText } : item)) || [];
 
-      return {
-        ...prev,
-        headerLines: updateList(prev.headerLines),
-        experimentSections: updateList(prev.experimentSections),
-        problemStatements: updateList(prev.problemStatements),
-        codeBlocks: updateList(prev.codeBlocks),
-        outputSections: updateList(prev.outputSections),
-        conclusionLines: updateList(prev.conclusionLines),
-      };
-    });
+        return {
+          ...doc,
+          sections: {
+            ...doc.sections,
+            headerLines: updateList(doc.sections.headerLines),
+            experimentSections: updateList(doc.sections.experimentSections),
+            problemStatements: updateList(doc.sections.problemStatements),
+            codeBlocks: updateList(doc.sections.codeBlocks),
+            outputSections: updateList(doc.sections.outputSections),
+            conclusionLines: updateList(doc.sections.conclusionLines),
+          },
+        };
+      })
+    );
   };
 
-  // Add global custom replacement
+  // Add global custom replacement to active document
   const handleAddCustomReplacement = (item) => {
-    setCustomReplacements((prev) => [...prev, item]);
+    setDocuments((prev) =>
+      prev.map((doc, idx) => {
+        if (idx !== activeDocIndex) return doc;
+        return {
+          ...doc,
+          customReplacements: [...(doc.customReplacements || []), item],
+        };
+      })
+    );
     handleApplyChanges();
   };
 
-  // Apply changes into PDF with celebratory feedback (Yuppy!)
+  // Apply changes to active document
   const handleApplyChanges = async () => {
     if (!pdfBuffer || !sections) return;
     try {
@@ -229,7 +363,11 @@ export default function App() {
       );
 
       const safeModified = clonePdfBytes(modifiedBytes);
-      setModifiedPdfBuffer(safeModified);
+      setDocuments((prev) =>
+        prev.map((doc, idx) =>
+          idx === activeDocIndex ? { ...doc, modifiedBytes: safeModified } : doc
+        )
+      );
 
       // Collect changes for celebration toast
       const diffs = [];
@@ -255,7 +393,99 @@ export default function App() {
     }
   };
 
-  // Download Modified PDF
+  // Apply Fixed Identity across ALL loaded documents
+  const handleApplyFixedToAll = async () => {
+    const currentFixed = fixedIdentity || getSavedFixedIdentity();
+    if (!currentFixed?.name) {
+      setShowFixedIdentityModal(true);
+      return;
+    }
+    if (documents.length === 0) return;
+
+    try {
+      setIsExporting(true);
+      const updatedDocs = [];
+
+      for (let i = 0; i < documents.length; i++) {
+        const doc = documents[i];
+        const updatedSecs = applyFixedToSections(doc.sections, currentFixed);
+        let newModBytes = doc.modifiedBytes;
+
+        try {
+          const mod = await applyPdfModifications(
+            clonePdfBytes(doc.originalBytes),
+            updatedSecs,
+            doc.customReplacements || []
+          );
+          newModBytes = clonePdfBytes(mod);
+        } catch (err) {
+          console.error(`Error updating document ${doc.fileName}:`, err);
+        }
+
+        updatedDocs.push({
+          ...doc,
+          sections: updatedSecs,
+          modifiedBytes: newModBytes,
+        });
+      }
+
+      setDocuments(updatedDocs);
+      setCelebrationChanges([
+        { label: 'Identity applied', from: 'All documents', to: currentFixed.name },
+      ]);
+      setShowCelebration(true);
+    } catch (err) {
+      console.error('Batch apply failed:', err);
+      alert('Batch apply failed: ' + err.message);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // Save new fixed identity from modal & apply to all documents
+  const handleSaveFixedIdentity = async (newFixed) => {
+    setFixedIdentity(newFixed);
+    if (documents.length > 0) {
+      setIsExporting(true);
+      try {
+        const updatedDocs = [];
+        for (let i = 0; i < documents.length; i++) {
+          const doc = documents[i];
+          const updatedSecs = applyFixedToSections(doc.sections, newFixed);
+          let newModBytes = doc.modifiedBytes;
+
+          try {
+            const mod = await applyPdfModifications(
+              clonePdfBytes(doc.originalBytes),
+              updatedSecs,
+              doc.customReplacements || []
+            );
+            newModBytes = clonePdfBytes(mod);
+          } catch (e) {
+            console.error(e);
+          }
+
+          updatedDocs.push({
+            ...doc,
+            sections: updatedSecs,
+            modifiedBytes: newModBytes,
+          });
+        }
+
+        setDocuments(updatedDocs);
+        setCelebrationChanges([
+          { label: 'Fixed Identity', from: 'Saved', to: newFixed.name },
+        ]);
+        setShowCelebration(true);
+      } catch (e) {
+        console.error('Error saving fixed identity across documents:', e);
+      } finally {
+        setIsExporting(false);
+      }
+    }
+  };
+
+  // Download active document as PDF
   const handleDownloadPdf = async (customName) => {
     if (!pdfBuffer || !sections) return;
     try {
@@ -277,7 +507,7 @@ export default function App() {
     }
   };
 
-  // Download Word (.docx)
+  // Download active document as Word (.docx)
   const handleDownloadDocx = async (customName) => {
     if (!sections) return;
     try {
@@ -292,50 +522,58 @@ export default function App() {
     }
   };
 
-  // Reset to initial dropzone
-  const handleReset = () => {
-    setPdfBuffer(null);
-    setModifiedPdfBuffer(null);
-    setSections(null);
-    setFileName('');
-  };
+  // Download ALL documents as a single .zip file
+  const handleDownloadAllZip = async () => {
+    if (documents.length === 0) return;
+    try {
+      setIsExporting(true);
+      const zip = new JSZip();
+      const usedNames = new Set();
 
-  // Save new fixed identity from modal & apply immediately
-  const handleSaveFixedIdentity = async (newFixed) => {
-    setFixedIdentity(newFixed);
-    if (pdfBuffer && sections) {
-      const updatedSecs = applyFixedToSections(sections, newFixed);
-      setSections(updatedSecs);
-      try {
-        const modBytes = await applyPdfModifications(
-          clonePdfBytes(pdfBuffer),
-          updatedSecs,
-          customReplacements
-        );
-        setModifiedPdfBuffer(clonePdfBytes(modBytes));
+      for (let i = 0; i < documents.length; i++) {
+        const doc = documents[i];
+        let finalBytes = doc.modifiedBytes;
 
-        // Diff for celebration toast
-        const diffs = [];
-        if (updatedSecs.personalTags) {
-          updatedSecs.personalTags.forEach((t) => {
-            if (t.currentValue !== t.originalValue) {
-              diffs.push({
-                label: t.label || t.key,
-                from: t.originalValue || '(empty)',
-                to: t.currentValue,
-              });
-            }
-          });
+        if (!finalBytes) {
+          finalBytes = await applyPdfModifications(
+            clonePdfBytes(doc.originalBytes),
+            doc.sections,
+            doc.customReplacements || []
+          );
         }
-        setCelebrationChanges(diffs);
-        setShowCelebration(true);
-      } catch (e) {
-        console.error('Error applying fixed identity:', e);
+
+        let outName = computeDocName(doc.sections, doc.fileName);
+        if (usedNames.has(outName)) {
+          let count = 2;
+          const base = outName.replace(/\.pdf$/i, '');
+          while (usedNames.has(`${base}_(${count}).pdf`)) {
+            count++;
+          }
+          outName = `${base}_(${count}).pdf`;
+        }
+        usedNames.add(outName);
+
+        zip.file(outName, clonePdfBytes(finalBytes));
       }
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const identitySuffix = fixedIdentity?.name ? `_${fixedIdentity.name.replace(/\s+/g, '_')}` : '';
+      saveAs(zipBlob, `iLoveSwap_Reports${identitySuffix}.zip`);
+    } catch (err) {
+      console.error('ZIP export error:', err);
+      alert('ZIP export failed: ' + err.message);
+    } finally {
+      setIsExporting(false);
     }
   };
 
-  // Keyboard shortcut listener: Cmd/Ctrl + S to apply changes
+  // Reset to initial dropzone
+  const handleReset = () => {
+    setDocuments([]);
+    setActiveDocIndex(0);
+  };
+
+  // Keyboard shortcut listener: Cmd/Ctrl + S to apply changes to active document
   useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
@@ -345,9 +583,9 @@ export default function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [pdfBuffer, sections, customReplacements]);
+  }, [pdfBuffer, sections, customReplacements, activeDocIndex]);
 
-  // Total sections count
+  // Total sections count for active doc
   const sectionsCount = sections
     ? (sections.personalTags?.length || 0) +
       (sections.headerLines?.length || 0) +
@@ -367,75 +605,93 @@ export default function App() {
         onOpenGuide={() => setShowGuideModal(true)}
         onOpenFixedIdentity={() => setShowFixedIdentityModal(true)}
         fixedIdentity={fixedIdentity}
-        hasDocument={!!pdfBuffer}
+        hasDocument={documents.length > 0}
         fileName={fileName}
+        totalDocs={documents.length}
         sectionsCount={sectionsCount}
         numPages={numPages}
       />
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 pb-32">
-        {!pdfBuffer || !sections ? (
+        {documents.length === 0 ? (
           <DropZone
-            onFileSelected={handleFileSelected}
+            onFilesSelected={handleFilesSelected}
             onLoadSample={loadSamplePdf}
             isLoading={isLoading}
+            loadingStatus={loadingStatus}
             fixedIdentity={fixedIdentity}
             onOpenFixedIdentityModal={() => setShowFixedIdentityModal(true)}
           />
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* Left Column: Sections & Tags Editor (7 Cols) */}
-            <div className="lg:col-span-7 space-y-6">
-              {/* Primary Identity Tags Editor */}
-              <PersonalTagsEditor
-                personalTags={sections.personalTags || []}
-                onTagChange={handleTagChange}
-                onAddTag={handleAddTag}
-                onRemoveTag={handleRemoveTag}
-                onApplyChanges={handleApplyChanges}
-                onHighlightItem={setHighlightedItemId}
-                fixedIdentity={fixedIdentity}
-                onOpenFixedIdentityModal={() => setShowFixedIdentityModal(true)}
-              />
+          <div>
+            {/* Multi-Document Navigation Bar */}
+            <DocumentTabs
+              documents={documents}
+              activeDocIndex={activeDocIndex}
+              onSelectDoc={setActiveDocIndex}
+              onRemoveDoc={handleRemoveDoc}
+              onAddFiles={handleAddFiles}
+              onApplyFixedToAll={handleApplyFixedToAll}
+              hasFixedIdentity={!!fixedIdentity?.name}
+              isLoading={isLoading || isExporting}
+            />
 
-              {/* Bifurcated Sections Navigator */}
-              <SectionList
-                sections={sections}
-                onSectionTextChange={handleSectionTextChange}
-                onHighlightItem={setHighlightedItemId}
-                onAddCustomReplacement={handleAddCustomReplacement}
-              />
-            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* Left Column: Sections & Tags Editor (7 Cols) */}
+              <div className="lg:col-span-7 space-y-6">
+                {/* Primary Identity Tags Editor */}
+                <PersonalTagsEditor
+                  personalTags={sections?.personalTags || []}
+                  onTagChange={handleTagChange}
+                  onAddTag={handleAddTag}
+                  onRemoveTag={handleRemoveTag}
+                  onApplyChanges={handleApplyChanges}
+                  onHighlightItem={setHighlightedItemId}
+                  fixedIdentity={fixedIdentity}
+                  onOpenFixedIdentityModal={() => setShowFixedIdentityModal(true)}
+                />
 
-            {/* Right Column: Live PDF Document Canvas Viewer (5 Cols) */}
-            <div className="lg:col-span-5 sticky top-20">
-              <PdfViewer
-                pdfBuffer={modifiedPdfBuffer || pdfBuffer}
-                originalPdfBuffer={pdfBuffer}
-                highlightedItemId={highlightedItemId}
-                sections={sections}
-                currentPage={currentPage}
-                onPageChange={setCurrentPage}
-                numPages={numPages}
-              />
+                {/* Bifurcated Sections Navigator */}
+                <SectionList
+                  sections={sections}
+                  onSectionTextChange={handleSectionTextChange}
+                  onHighlightItem={setHighlightedItemId}
+                  onAddCustomReplacement={handleAddCustomReplacement}
+                />
+              </div>
+
+              {/* Right Column: Live PDF Document Canvas Viewer (5 Cols) */}
+              <div className="lg:col-span-5 sticky top-20">
+                <PdfViewer
+                  pdfBuffer={modifiedPdfBuffer || pdfBuffer}
+                  originalPdfBuffer={pdfBuffer}
+                  highlightedItemId={highlightedItemId}
+                  sections={sections}
+                  currentPage={currentPage}
+                  onPageChange={setCurrentPage}
+                  numPages={numPages}
+                />
+              </div>
             </div>
           </div>
         )}
       </main>
 
       {/* Floating Export & Renaming Toolbar */}
-      {pdfBuffer && sections && (
+      {documents.length > 0 && sections && (
         <ExportBar
           onDownloadPdf={handleDownloadPdf}
           onDownloadDocx={handleDownloadDocx}
+          onDownloadAllZip={handleDownloadAllZip}
+          totalDocs={documents.length}
           defaultFileName={fileName}
           sections={sections}
           isExporting={isExporting}
         />
       )}
 
-      {/* Celebratory Feedback Banner ("Yuppy !! Change is been made") */}
+      {/* Status Toast */}
       {showCelebration && (
         <YuppyCelebration
           changes={celebrationChanges}
@@ -448,7 +704,7 @@ export default function App() {
         <ExtensionGuideModal onClose={() => setShowGuideModal(false)} />
       )}
 
-      {/* Fixed Identity Permanent Settings Modal (From Screenshot!) */}
+      {/* Fixed Identity Permanent Settings Modal */}
       <FixedIdentityModal
         isOpen={showFixedIdentityModal}
         onClose={() => setShowFixedIdentityModal(false)}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileText, RefreshCw, Puzzle, Shield } from 'lucide-react';
+import { RefreshCw, Puzzle, Shield } from 'lucide-react';
 
 export default function Navbar({
   onLoadSample,
@@ -9,7 +9,7 @@ export default function Navbar({
   fixedIdentity,
   hasDocument,
   fileName,
-  sectionsCount,
+  totalDocs = 1,
   numPages,
 }) {
   return (
@@ -22,7 +22,9 @@ export default function Navbar({
 
           {hasDocument && (
             <span className="hidden sm:inline text-xs text-gray-500 border-l border-gray-200 pl-3 truncate max-w-xs">
-              {fileName} ({numPages} {numPages === 1 ? 'page' : 'pages'})
+              {totalDocs > 1
+                ? `${totalDocs} documents loaded`
+                : `${fileName} (${numPages} ${numPages === 1 ? 'page' : 'pages'})`}
             </span>
           )}
         </div>
