@@ -296,22 +296,109 @@ export default function App() {
       prev.map((doc, idx) => {
         if (idx !== activeDocIndex || !doc.sections) return doc;
         const updateList = (list) =>
-          list?.map((item) => (item.id === itemId ? { ...item, currentText: newText } : item)) || [];
+          list?.map((item) =>
+            item.id === itemId || item.itemId === itemId
+              ? { ...item, currentText: newText, isRemoved: false }
+              : item
+          ) || [];
+
+        const updateTags = (tags) =>
+          tags?.map((tag) =>
+            tag.id === itemId || tag.itemId === itemId
+              ? { ...tag, currentValue: newText, isRemoved: false }
+              : tag
+          ) || [];
 
         return {
           ...doc,
           sections: {
             ...doc.sections,
+            personalTags: updateTags(doc.sections.personalTags),
             headerLines: updateList(doc.sections.headerLines),
             experimentSections: updateList(doc.sections.experimentSections),
             problemStatements: updateList(doc.sections.problemStatements),
             codeBlocks: updateList(doc.sections.codeBlocks),
             outputSections: updateList(doc.sections.outputSections),
             conclusionLines: updateList(doc.sections.conclusionLines),
+            otherLines: updateList(doc.sections.otherLines),
           },
         };
       })
     );
+  };
+
+  // Toggle remove/restore for any item in active document
+  const handleToggleRemoveItem = async (itemId, isRemoved) => {
+    let updatedSections = null;
+
+    setDocuments((prev) => {
+      const next = prev.map((doc, idx) => {
+        if (idx !== activeDocIndex || !doc.sections) return doc;
+        const updateList = (list) =>
+          list?.map((item) =>
+            item.id === itemId || item.itemId === itemId
+              ? {
+                  ...item,
+                  isRemoved: isRemoved !== undefined ? isRemoved : !item.isRemoved,
+                  currentText:
+                    (isRemoved !== undefined ? isRemoved : !item.isRemoved)
+                      ? ''
+                      : item.currentText || item.originalText,
+                }
+              : item
+          ) || [];
+
+        const updateTags = (tags) =>
+          tags?.map((tag) =>
+            tag.id === itemId || tag.itemId === itemId
+              ? {
+                  ...tag,
+                  isRemoved: isRemoved !== undefined ? isRemoved : !tag.isRemoved,
+                  currentValue:
+                    (isRemoved !== undefined ? isRemoved : !tag.isRemoved)
+                      ? ''
+                      : tag.currentValue || tag.originalValue,
+                }
+              : tag
+          ) || [];
+
+        const newSecs = {
+          ...doc.sections,
+          personalTags: updateTags(doc.sections.personalTags),
+          headerLines: updateList(doc.sections.headerLines),
+          experimentSections: updateList(doc.sections.experimentSections),
+          problemStatements: updateList(doc.sections.problemStatements),
+          codeBlocks: updateList(doc.sections.codeBlocks),
+          outputSections: updateList(doc.sections.outputSections),
+          conclusionLines: updateList(doc.sections.conclusionLines),
+          otherLines: updateList(doc.sections.otherLines),
+        };
+        updatedSections = newSecs;
+        return {
+          ...doc,
+          sections: newSecs,
+        };
+      });
+      return next;
+    });
+
+    if (pdfBuffer && updatedSections) {
+      try {
+        const modBytes = await applyPdfModifications(
+          clonePdfBytes(pdfBuffer),
+          updatedSections,
+          customReplacements
+        );
+        const safeModified = clonePdfBytes(modBytes);
+        setDocuments((prev) =>
+          prev.map((doc, idx) =>
+            idx === activeDocIndex ? { ...doc, modifiedBytes: safeModified } : doc
+          )
+        );
+      } catch (e) {
+        console.error('Error applying removal:', e);
+      }
+    }
   };
 
   // Add global custom replacement to active document
@@ -623,6 +710,7 @@ export default function App() {
                   onTagChange={handleTagChange}
                   onAddTag={handleAddTag}
                   onRemoveTag={handleRemoveTag}
+                  onToggleRemoveTag={handleToggleRemoveItem}
                   onApplyChanges={handleApplyChanges}
                   onHighlightItem={setHighlightedItemId}
                   fixedIdentity={fixedIdentity}
@@ -633,6 +721,7 @@ export default function App() {
                 <SectionList
                   sections={sections}
                   onSectionTextChange={handleSectionTextChange}
+                  onToggleRemoveItem={handleToggleRemoveItem}
                   onHighlightItem={setHighlightedItemId}
                   onAddCustomReplacement={handleAddCustomReplacement}
                 />
@@ -648,6 +737,9 @@ export default function App() {
                   currentPage={currentPage}
                   onPageChange={setCurrentPage}
                   numPages={numPages}
+                  onSectionTextChange={handleSectionTextChange}
+                  onToggleRemoveItem={handleToggleRemoveItem}
+                  onApplyChanges={handleApplyChanges}
                 />
               </div>
             </div>

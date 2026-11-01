@@ -1,6 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { pdfjsLib, clonePdfBytes } from '../utils/pdfSetup.js';
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  ZoomIn,
+  ZoomOut,
+  Edit3,
+  Trash2,
+  RotateCcw,
+  Check,
+  X,
+} from 'lucide-react';
 
 export default function PdfViewer({
   pdfBuffer,
@@ -11,6 +21,9 @@ export default function PdfViewer({
   onPageChange,
   numPages,
   showOverlays = true,
+  onSectionTextChange,
+  onToggleRemoveItem,
+  onApplyChanges,
 }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -19,8 +32,14 @@ export default function PdfViewer({
   const [viewportDims, setViewportDims] = useState({ width: 595, height: 842 });
   const [pdfDoc, setPdfDoc] = useState(null);
   const [viewMode, setViewMode] = useState('modified');
+  const [isWordMode, setIsWordMode] = useState(false);
 
-  const activeBuffer = viewMode === 'original' && originalPdfBuffer ? originalPdfBuffer : pdfBuffer;
+  // Direct on-page editing state
+  const [activeEditingItem, setActiveEditingItem] = useState(null);
+  const [inlineEditText, setInlineEditText] = useState('');
+
+  const activeBuffer =
+    viewMode === 'original' && originalPdfBuffer ? originalPdfBuffer : pdfBuffer;
 
   useEffect(() => {
     if (!activeBuffer) return;
@@ -99,72 +118,101 @@ export default function PdfViewer({
     };
   }, [pdfDoc, currentPage, scale]);
 
-  const pageOverlays = [];
-  if (showOverlays && sections && viewMode === 'modified') {
-    if (sections.personalTags) {
-      sections.personalTags.forEach((tag) => {
-        if (tag.pageNum === currentPage) {
-          const isModified = tag.currentValue !== tag.originalValue;
-          pageOverlays.push({
-            id: tag.itemId || tag.id,
-            text: isModified ? `${tag.prefix || ''}${tag.currentValue}` : tag.fullOriginalText,
-            isModified,
-            x: tag.x,
-            y: tag.y,
-            width: tag.width,
-            height: tag.height,
-            fontSize: tag.fontSize || 12,
-            pdfPageHeight: 841.89,
-          });
-        }
-      });
-    }
-
-    const checkGroup = (group) => {
-      if (!group) return;
-      group.forEach((item) => {
-        if (item.pageNum === currentPage && item.currentText !== item.originalText) {
-          pageOverlays.push({
-            id: item.itemId || item.id,
-            text: item.currentText,
-            isModified: true,
-            x: item.x,
-            y: item.y,
-            width: item.width,
-            height: item.height,
-            fontSize: item.fontSize || 11,
-            pdfPageHeight: 841.89,
+  // Collect all items belonging to currentPage
+  const pageItems = [];
+  if (sections) {
+    const addGroup = (list, type) => {
+      if (!list) return;
+      list.forEach((it) => {
+        if (it.pageNum === currentPage) {
+          pageItems.push({
+            ...it,
+            itemType: type,
           });
         }
       });
     };
 
-    checkGroup(sections.experimentSections);
-    checkGroup(sections.problemStatements);
-    checkGroup(sections.conclusionLines);
+    addGroup(sections.personalTags, 'personal');
+    addGroup(sections.headerLines, 'header');
+    addGroup(sections.experimentSections, 'experiment');
+    addGroup(sections.problemStatements, 'problem');
+    addGroup(sections.outputSections, 'output');
+    addGroup(sections.conclusionLines, 'conclusion');
+    addGroup(sections.codeBlocks, 'code');
+    addGroup(sections.otherLines, 'other');
   }
+
+  // Handle inline edit save
+  const handleSaveInline = () => {
+    if (!activeEditingItem) return;
+    if (activeEditingItem.itemType === 'personal') {
+      onSectionTextChange?.(activeEditingItem.id, inlineEditText);
+    } else {
+      onSectionTextChange?.(activeEditingItem.id, inlineEditText);
+    }
+    setActiveEditingItem(null);
+    onApplyChanges?.();
+  };
+
+  // Handle inline remove
+  const handleRemoveInline = (itemId) => {
+    onToggleRemoveItem?.(itemId, true);
+    setActiveEditingItem(null);
+    onApplyChanges?.();
+  };
+
+  // Handle inline restore
+  const handleRestoreInline = (itemId) => {
+    onToggleRemoveItem?.(itemId, false);
+    onApplyChanges?.();
+  };
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 flex flex-col h-full">
-      <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-200 text-xs">
-        <div className="flex items-center border border-gray-200 rounded overflow-hidden">
+      {/* Viewer Header Toolbar */}
+      <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-200 text-xs flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center border border-gray-200 rounded overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setViewMode('modified')}
+              className={`px-3 py-1 font-medium transition-colors ${
+                viewMode === 'modified'
+                  ? 'bg-gray-900 text-white'
+                  : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              Modified
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('original')}
+              className={`px-3 py-1 font-medium transition-colors ${
+                viewMode === 'original'
+                  ? 'bg-gray-900 text-white'
+                  : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              Original
+            </button>
+          </div>
+
           <button
             type="button"
-            onClick={() => setViewMode('modified')}
-            className={`px-3 py-1 font-medium ${
-              viewMode === 'modified' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-50'
+            onClick={() => {
+              setIsWordMode(!isWordMode);
+              setActiveEditingItem(null);
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1 border rounded text-xs font-medium transition-colors ${
+              isWordMode
+                ? 'bg-red-600 border-red-600 text-white'
+                : 'border-gray-300 text-gray-700 hover:bg-gray-50'
             }`}
+            title="Click any text on the page to edit or remove it like Microsoft Word"
           >
-            Modified
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('original')}
-            className={`px-3 py-1 font-medium ${
-              viewMode === 'original' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-50'
-            }`}
-          >
-            Original
+            <Edit3 className="w-3.5 h-3.5" />
+            <span>{isWordMode ? 'Exit Word Mode' : 'Word Mode'}</span>
           </button>
         </div>
 
@@ -199,7 +247,7 @@ export default function PdfViewer({
             >
               <ZoomOut className="w-3.5 h-3.5" />
             </button>
-            <span className="px-2 text-gray-700">
+            <span className="px-2 text-gray-700 font-mono text-[11px]">
               {Math.round(scale * 100)}%
             </span>
             <button
@@ -213,6 +261,21 @@ export default function PdfViewer({
         </div>
       </div>
 
+      {isWordMode && (
+        <div className="mb-2 px-3 py-1.5 bg-red-50 border border-red-200 rounded text-xs text-red-800 flex items-center justify-between">
+          <span>
+            <b>Word Mode Active:</b> Click on any text on the page to edit or remove it.
+          </span>
+          <button
+            onClick={() => setIsWordMode(false)}
+            className="text-red-700 hover:underline font-medium"
+          >
+            Done
+          </button>
+        </div>
+      )}
+
+      {/* Canvas & Overlay Container */}
       <div
         ref={containerRef}
         className="flex-1 overflow-auto flex justify-center items-start min-h-[580px] max-h-[820px] bg-gray-50 border border-gray-200 rounded p-4 relative"
@@ -223,17 +286,30 @@ export default function PdfViewer({
         >
           <canvas ref={canvasRef} className="block w-full h-full" />
 
-          {pageOverlays.map((ov) => {
-            const pdfPageH = ov.pdfPageHeight || 841.89;
-            const topPx = (pdfPageH - ov.y - ov.height) * scale;
-            const leftPx = ov.x * scale;
-            const widthPx = Math.max(ov.width * scale, 120 * scale);
-            const heightPx = Math.max((ov.height + 4) * scale, 16 * scale);
-            const isHighlighted = highlightedItemId === ov.id;
+          {/* Interactive Text Layer (Word Mode & Highlighting) */}
+          {pageItems.map((item) => {
+            const pdfPageH = item.pdfPageHeight || 841.89;
+            const topPx = (pdfPageH - item.y - item.height) * scale;
+            const leftPx = item.x * scale;
+            const widthPx = Math.max(item.width * scale, 75 * scale);
+            const heightPx = Math.max((item.height + 4) * scale, 15 * scale);
+
+            const isHighlighted = highlightedItemId === (item.itemId || item.id);
+            const isRemoved = !!item.isRemoved;
+            const displayText =
+              item.itemType === 'personal'
+                ? isRemoved
+                  ? ''
+                  : `${item.prefix || ''}${item.currentValue}`
+                : isRemoved
+                ? ''
+                : item.currentText;
+
+            const isEditing = activeEditingItem?.id === item.id;
 
             return (
               <div
-                key={ov.id}
+                key={item.id}
                 style={{
                   position: 'absolute',
                   top: `${topPx}px`,
@@ -241,21 +317,86 @@ export default function PdfViewer({
                   width: `${widthPx}px`,
                   height: `${heightPx}px`,
                 }}
-                className={`flex items-center ${
-                  isHighlighted
+                onClick={(e) => {
+                  if (isWordMode) {
+                    e.stopPropagation();
+                    if (isRemoved) {
+                      handleRestoreInline(item.id);
+                    } else {
+                      setActiveEditingItem(item);
+                      setInlineEditText(
+                        item.itemType === 'personal'
+                          ? item.currentValue
+                          : item.currentText
+                      );
+                    }
+                  }
+                }}
+                className={`transition-colors select-none ${
+                  isWordMode
+                    ? isRemoved
+                      ? 'border border-dashed border-red-500 bg-red-50/50 cursor-pointer'
+                      : 'hover:border hover:border-gray-900 hover:bg-gray-100/40 cursor-pointer'
+                    : isHighlighted
                     ? 'border-2 border-red-500 bg-red-50/20'
-                    : ov.isModified
-                    ? 'border border-gray-800 bg-white px-1 text-gray-900'
-                    : 'border border-dashed border-gray-300'
+                    : ''
                 }`}
+                title={
+                  isWordMode
+                    ? isRemoved
+                      ? 'Click to Restore'
+                      : 'Click to Edit or Remove'
+                    : undefined
+                }
               >
-                {ov.isModified && (
-                  <span
-                    className="font-medium text-gray-900 truncate"
-                    style={{ fontSize: `${ov.fontSize * scale}px` }}
-                  >
-                    {ov.text}
+                {isRemoved && isWordMode && (
+                  <span className="text-[10px] text-red-600 font-bold px-1 py-0.5 bg-white/90 border border-red-300 rounded shadow-xs truncate block">
+                    [Removed - Click to Restore]
                   </span>
+                )}
+
+                {/* Inline Editing Popover */}
+                {isEditing && (
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="absolute z-40 -top-12 left-0 bg-white border border-gray-900 rounded p-1.5 shadow-lg flex items-center gap-1.5 min-w-[280px]"
+                  >
+                    <input
+                      autoFocus
+                      type="text"
+                      value={inlineEditText}
+                      onChange={(e) => setInlineEditText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSaveInline();
+                        if (e.key === 'Escape') setActiveEditingItem(null);
+                      }}
+                      className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs focus:border-red-500 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSaveInline}
+                      className="flex items-center gap-1 px-2.5 py-1 bg-gray-900 hover:bg-black text-white rounded text-xs font-medium"
+                    >
+                      <Check className="w-3 h-3" />
+                      <span>Save</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveInline(item.id)}
+                      className="flex items-center gap-1 px-2 py-1 border border-red-300 text-red-600 hover:bg-red-50 rounded text-xs font-medium"
+                      title="Erase / Remove line from document"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>Remove</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveEditingItem(null)}
+                      className="text-gray-400 hover:text-gray-600 p-1"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 )}
               </div>
             );

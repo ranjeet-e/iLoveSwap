@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, Check, ArrowRight } from 'lucide-react';
+import { Plus, Trash2, ArrowRight, RotateCcw } from 'lucide-react';
 import { applyFixedToSections } from '../utils/identityHelper';
 
 export default function PersonalTagsEditor({
-  personalTags,
+  personalTags = [],
   onTagChange,
   onAddTag,
   onRemoveTag,
+  onToggleRemoveTag,
   onApplyChanges,
   onHighlightItem,
   fixedIdentity,
@@ -34,6 +35,9 @@ export default function PersonalTagsEditor({
   const handleRevertAll = () => {
     personalTags.forEach((tag) => {
       onTagChange(tag.id, tag.originalValue);
+      if (tag.isRemoved) {
+        onToggleRemoveTag?.(tag.id, false);
+      }
     });
     onApplyChanges?.();
   };
@@ -82,7 +86,9 @@ export default function PersonalTagsEditor({
     setShowAddForm(false);
   };
 
-  const modifiedCount = personalTags.filter((t) => t.currentValue !== t.originalValue).length;
+  const modifiedCount = personalTags.filter(
+    (t) => t.currentValue !== t.originalValue || t.isRemoved
+  ).length;
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-5">
@@ -92,7 +98,7 @@ export default function PersonalTagsEditor({
             Student Details
           </h2>
           <p className="text-xs text-gray-500 mt-0.5">
-            Detected tags from Page 1.
+            Edit details or click Remove to erase any tag from the document.
           </p>
         </div>
 
@@ -145,23 +151,38 @@ export default function PersonalTagsEditor({
 
       <div className="space-y-3">
         {personalTags.map((tag) => {
-          const isModified = tag.currentValue !== tag.originalValue;
+          const isModified = tag.currentValue !== tag.originalValue && !tag.isRemoved;
+          const isRemoved = !!tag.isRemoved;
 
           return (
             <div
               key={tag.id}
               onMouseEnter={() => onHighlightItem?.(tag.itemId || tag.id)}
               onMouseLeave={() => onHighlightItem?.(null)}
-              className="p-3 rounded border border-gray-200 bg-gray-50/50"
+              className={`p-3 rounded border transition-colors ${
+                isRemoved
+                  ? 'border-gray-200 bg-gray-100/60 opacity-75'
+                  : 'border-gray-200 bg-gray-50/50'
+              }`}
             >
               <div className="flex items-center justify-between mb-1.5 text-xs">
-                <span className="font-medium text-gray-700">
+                <span
+                  className={`font-medium ${
+                    isRemoved ? 'line-through text-gray-400' : 'text-gray-700'
+                  }`}
+                >
                   {tag.label || tag.key}
                 </span>
 
-                {isModified ? (
+                {isRemoved ? (
+                  <span className="text-[11px] text-red-600 font-medium">
+                    Removed from PDF
+                  </span>
+                ) : isModified ? (
                   <span className="flex items-center gap-1 text-[11px] text-red-600">
-                    <span className="line-through text-gray-400">{tag.originalValue || '(empty)'}</span>
+                    <span className="line-through text-gray-400">
+                      {tag.originalValue || '(empty)'}
+                    </span>
                     <ArrowRight className="w-3 h-3" />
                     <span className="font-medium">{tag.currentValue}</span>
                   </span>
@@ -175,19 +196,42 @@ export default function PersonalTagsEditor({
               <div className="flex items-center gap-2">
                 <input
                   type="text"
-                  value={tag.currentValue}
+                  disabled={isRemoved}
+                  value={isRemoved ? '' : tag.currentValue}
+                  placeholder={isRemoved ? '(Erased / Removed)' : ''}
                   onChange={(e) => onTagChange(tag.id, e.target.value)}
-                  className="w-full text-xs bg-white border border-gray-300 rounded px-2.5 py-1.5 focus:border-red-500 focus:outline-none"
+                  className={`w-full text-xs bg-white border rounded px-2.5 py-1.5 focus:border-red-500 focus:outline-none ${
+                    isRemoved
+                      ? 'border-gray-200 bg-gray-100 text-gray-400 italic'
+                      : 'border-gray-300 text-gray-900'
+                  }`}
                 />
 
-                {tag.isCustom && (
+                {isRemoved ? (
                   <button
-                    onClick={() => onRemoveTag(tag.id)}
+                    onClick={() => onToggleRemoveTag?.(tag.id, false)}
                     type="button"
-                    className="p-1.5 text-gray-400 hover:text-red-600 rounded"
-                    title="Remove"
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs border border-gray-300 hover:bg-gray-100 text-gray-700 font-medium rounded transition-colors shrink-0"
+                    title="Restore tag"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <RotateCcw className="w-3 h-3 text-gray-500" />
+                    <span>Restore</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      if (tag.isCustom) {
+                        onRemoveTag?.(tag.id);
+                      } else {
+                        onToggleRemoveTag?.(tag.id, true);
+                      }
+                    }}
+                    type="button"
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs border border-gray-200 hover:border-red-300 hover:text-red-600 text-gray-500 rounded transition-colors shrink-0"
+                    title="Erase / Remove from document"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    <span>Remove</span>
                   </button>
                 )}
               </div>
@@ -197,7 +241,10 @@ export default function PersonalTagsEditor({
       </div>
 
       {showAddForm ? (
-        <form onSubmit={handleAddNewField} className="mt-4 p-3 rounded border border-gray-200 bg-gray-50 text-xs">
+        <form
+          onSubmit={handleAddNewField}
+          className="mt-4 p-3 rounded border border-gray-200 bg-gray-50 text-xs"
+        >
           <div className="grid grid-cols-2 gap-2 mb-2">
             <input
               type="text"
@@ -224,27 +271,27 @@ export default function PersonalTagsEditor({
             </button>
             <button
               type="submit"
-              className="px-3 py-1 bg-gray-900 text-white rounded hover:bg-black"
+              className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded font-medium"
             >
-              Add
+              Add Field
             </button>
           </div>
         </form>
       ) : (
-        <div className="mt-4 pt-3 flex items-center justify-between border-t border-gray-100 text-xs">
+        <div className="mt-4 flex justify-between items-center text-xs">
           <button
-            type="button"
             onClick={() => setShowAddForm(true)}
+            type="button"
             className="flex items-center gap-1 text-gray-600 hover:text-gray-900 font-medium"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>Add Field</span>
+            <span>Add Custom Detail</span>
           </button>
 
           <button
-            type="button"
             onClick={onApplyChanges}
-            className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white font-medium rounded transition-colors"
+            type="button"
+            className="px-4 py-1.5 bg-gray-900 hover:bg-black text-white font-medium rounded transition-colors"
           >
             Apply Changes
           </button>

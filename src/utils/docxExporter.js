@@ -16,6 +16,7 @@ import { saveAs } from 'file-saver';
 
 /**
  * Exports bifurcated and edited sections into a clean, editable Microsoft Word (.docx) document.
+ * Omit any removed lines or tags so the Word file matches the modified PDF.
  * 
  * @param {Object} sections - parsed & modified sections
  * @param {string} fileName - output file name (e.g. "report.docx")
@@ -24,8 +25,11 @@ export async function exportToDocx(sections, fileName = 'Document.docx') {
   const children = [];
 
   // 1. Institution Header
-  if (sections.headerLines && sections.headerLines.length > 0) {
-    for (const h of sections.headerLines) {
+  const activeHeaders = (sections.headerLines || []).filter(
+    (h) => !h.isRemoved && (h.currentText || h.originalText)
+  );
+  if (activeHeaders.length > 0) {
+    for (const h of activeHeaders) {
       children.push(
         new Paragraph({
           text: h.currentText || h.originalText,
@@ -43,13 +47,15 @@ export async function exportToDocx(sections, fileName = 'Document.docx') {
         })
       );
     }
-    // Add divider spacing
     children.push(new Paragraph({ spacing: { after: 200 } }));
   }
 
   // 2. Experiment / Project Title
-  if (sections.experimentSections && sections.experimentSections.length > 0) {
-    for (const exp of sections.experimentSections) {
+  const activeExp = (sections.experimentSections || []).filter(
+    (exp) => !exp.isRemoved && (exp.currentText || exp.originalText)
+  );
+  if (activeExp.length > 0) {
+    for (const exp of activeExp) {
       children.push(
         new Paragraph({
           alignment: AlignmentType.CENTER,
@@ -71,8 +77,11 @@ export async function exportToDocx(sections, fileName = 'Document.docx') {
   }
 
   // 3. Student Identity Box / Table (Highlight section!)
-  if (sections.personalTags && sections.personalTags.length > 0) {
-    const tableRows = sections.personalTags.map((tag) => {
+  const activeTags = (sections.personalTags || []).filter(
+    (t) => !t.isRemoved && (t.currentValue || t.originalValue)
+  );
+  if (activeTags.length > 0) {
+    const tableRows = activeTags.map((tag) => {
       const label = tag.label || tag.prefix.replace(/[:\-]/g, '').trim() || 'Detail';
       const val = tag.currentValue || tag.originalValue;
 
@@ -135,7 +144,10 @@ export async function exportToDocx(sections, fileName = 'Document.docx') {
   }
 
   // 4. Problem Statements
-  if (sections.problemStatements && sections.problemStatements.length > 0) {
+  const activeProblems = (sections.problemStatements || []).filter(
+    (p) => !p.isRemoved && (p.currentText || p.originalText)
+  );
+  if (activeProblems.length > 0) {
     children.push(
       new Paragraph({
         heading: HeadingLevel.HEADING_2,
@@ -152,7 +164,7 @@ export async function exportToDocx(sections, fileName = 'Document.docx') {
       })
     );
 
-    for (const prob of sections.problemStatements) {
+    for (const prob of activeProblems) {
       children.push(
         new Paragraph({
           spacing: { before: 80, after: 80 },
@@ -171,7 +183,10 @@ export async function exportToDocx(sections, fileName = 'Document.docx') {
   }
 
   // 5. Code Blocks
-  if (sections.codeBlocks && sections.codeBlocks.length > 0) {
+  const activeCode = (sections.codeBlocks || []).filter(
+    (c) => !c.isRemoved && (c.currentText || c.originalText)
+  );
+  if (activeCode.length > 0) {
     children.push(
       new Paragraph({
         heading: HeadingLevel.HEADING_2,
@@ -188,9 +203,7 @@ export async function exportToDocx(sections, fileName = 'Document.docx') {
       })
     );
 
-    const codeText = sections.codeBlocks
-      .map((c) => c.currentText || c.originalText)
-      .join('\n');
+    const codeText = activeCode.map((c) => c.currentText || c.originalText).join('\n');
 
     children.push(
       new Table({
@@ -231,7 +244,10 @@ export async function exportToDocx(sections, fileName = 'Document.docx') {
   }
 
   // 6. Conclusion
-  if (sections.conclusionLines && sections.conclusionLines.length > 0) {
+  const activeConcl = (sections.conclusionLines || []).filter(
+    (c) => !c.isRemoved && (c.currentText || c.originalText)
+  );
+  if (activeConcl.length > 0) {
     children.push(
       new Paragraph({
         heading: HeadingLevel.HEADING_2,
@@ -248,17 +264,38 @@ export async function exportToDocx(sections, fileName = 'Document.docx') {
       })
     );
 
-    for (const concl of sections.conclusionLines) {
+    for (const concl of activeConcl) {
       children.push(
         new Paragraph({
           spacing: { before: 80, after: 80 },
           children: [
             new TextRun({
               text: concl.currentText || concl.originalText,
-              bold: true,
               size: 22,
               font: 'Calibri',
-              color: '15803D',
+            }),
+          ],
+        })
+      );
+    }
+    children.push(new Paragraph({ spacing: { after: 240 } }));
+  }
+
+  // 7. General Document Text (Other lines)
+  const activeOther = (sections.otherLines || []).filter(
+    (o) => !o.isRemoved && (o.currentText || o.originalText)
+  );
+  if (activeOther.length > 0) {
+    for (const o of activeOther) {
+      children.push(
+        new Paragraph({
+          spacing: { before: 60, after: 60 },
+          children: [
+            new TextRun({
+              text: o.currentText || o.originalText,
+              size: 21,
+              font: 'Calibri',
+              color: '334155',
             }),
           ],
         })
@@ -269,7 +306,16 @@ export async function exportToDocx(sections, fileName = 'Document.docx') {
   const doc = new Document({
     sections: [
       {
-        properties: {},
+        properties: {
+          page: {
+            margin: {
+              top: 1440, // 1 inch
+              bottom: 1440,
+              left: 1440,
+              right: 1440,
+            },
+          },
+        },
         children,
       },
     ],
@@ -278,5 +324,4 @@ export async function exportToDocx(sections, fileName = 'Document.docx') {
   const blob = await Packer.toBlob(doc);
   const outName = fileName.endsWith('.docx') ? fileName : `${fileName}.docx`;
   saveAs(blob, outName);
-  return blob;
 }
