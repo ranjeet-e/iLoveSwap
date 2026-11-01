@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
-import { Plus, X, Layers, ShieldCheck } from 'lucide-react';
+import { Plus, X, Layers, ShieldCheck, FileText } from 'lucide-react';
+import { isWordDocument } from '../utils/docxParser';
 
 export default function DocumentTabs({
   documents = [],
@@ -15,11 +16,18 @@ export default function DocumentTabs({
 
   const handleFiles = (e) => {
     if (e.target.files && e.target.files.length > 0) {
-      const pdfs = Array.from(e.target.files).filter(
-        (f) => f.type === 'application/pdf' || f.name.endsWith('.pdf')
-      );
-      if (pdfs.length > 0) {
-        onAddFiles?.(pdfs);
+      const valid = Array.from(e.target.files).filter((f) => {
+        const name = f.name.toLowerCase();
+        return (
+          name.endsWith('.pdf') ||
+          name.endsWith('.docx') ||
+          name.endsWith('.doc') ||
+          f.type === 'application/pdf' ||
+          isWordDocument(f)
+        );
+      });
+      if (valid.length > 0) {
+        onAddFiles?.(valid);
       }
       e.target.value = '';
     }
@@ -59,12 +67,12 @@ export default function DocumentTabs({
             className="flex items-center gap-1 px-2.5 py-1 border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded transition-colors text-xs"
           >
             <Plus className="w-3.5 h-3.5 text-gray-500" />
-            <span>Add PDF</span>
+            <span>Add Document</span>
           </button>
           <input
             ref={fileInputRef}
             type="file"
-            accept="application/pdf"
+            accept=".pdf, .docx, .doc, application/pdf, application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/msword"
             multiple
             className="hidden"
             onChange={handleFiles}
@@ -77,8 +85,9 @@ export default function DocumentTabs({
         {documents.map((doc, idx) => {
           const isActive = idx === activeDocIndex;
           const isModified = doc.sections?.personalTags?.some(
-            (t) => t.currentValue !== t.originalValue
+            (t) => t.currentValue !== t.originalValue || t.isRemoved
           );
+          const isDocx = doc.docType === 'docx' || isWordDocument(doc.fileName);
 
           return (
             <div
@@ -90,10 +99,11 @@ export default function DocumentTabs({
                   : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-gray-900'
               }`}
             >
-              <span className="text-[11px] text-gray-400 font-mono">
-                {idx + 1}.
+              <span className="text-[10px] uppercase font-mono px-1 py-0.5 rounded bg-gray-100 border border-gray-200 text-gray-600 font-medium">
+                {isDocx ? 'DOCX' : 'PDF'}
               </span>
-              <span className="truncate max-w-[160px]" title={doc.fileName}>
+
+              <span className="truncate max-w-[150px]" title={doc.fileName}>
                 {doc.fileName}
               </span>
 

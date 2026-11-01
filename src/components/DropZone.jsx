@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
-import { Upload, Files } from 'lucide-react';
+import { Upload } from 'lucide-react';
+import { isWordDocument } from '../utils/docxParser';
 
 export default function DropZone({
   onFilesSelected,
@@ -11,6 +12,19 @@ export default function DropZone({
 }) {
   const fileInputRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
+
+  const filterSupportedFiles = (fileList) => {
+    return Array.from(fileList).filter((f) => {
+      const name = f.name.toLowerCase();
+      return (
+        name.endsWith('.pdf') ||
+        name.endsWith('.docx') ||
+        name.endsWith('.doc') ||
+        f.type === 'application/pdf' ||
+        isWordDocument(f)
+      );
+    });
+  };
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -26,22 +40,18 @@ export default function DropZone({
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const pdfs = Array.from(e.dataTransfer.files).filter(
-        (f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')
-      );
-      if (pdfs.length > 0) {
-        onFilesSelected(pdfs);
+      const valid = filterSupportedFiles(e.dataTransfer.files);
+      if (valid.length > 0) {
+        onFilesSelected(valid);
       }
     }
   };
 
   const handleFileInputChange = (e) => {
     if (e.target.files && e.target.files.length > 0) {
-      const pdfs = Array.from(e.target.files).filter(
-        (f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')
-      );
-      if (pdfs.length > 0) {
-        onFilesSelected(pdfs);
+      const valid = filterSupportedFiles(e.target.files);
+      if (valid.length > 0) {
+        onFilesSelected(valid);
       }
     }
   };
@@ -50,10 +60,10 @@ export default function DropZone({
     <div className="max-w-2xl mx-auto py-12 px-4">
       <div className="text-center mb-8">
         <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">
-          PDF Section & Identity Editor
+          PDF & Word Document Editor
         </h1>
         <p className="mt-2 text-sm text-gray-500">
-          Upload one or multiple PDFs to batch-extract sections, swap student details, and export.
+          Upload PDF or Word documents to extract sections, swap student details, and export.
         </p>
       </div>
 
@@ -83,7 +93,7 @@ export default function DropZone({
         <input
           ref={fileInputRef}
           type="file"
-          accept="application/pdf"
+          accept=".pdf, .docx, .doc, application/pdf, application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/msword"
           multiple
           className="hidden"
           onChange={handleFileInputChange}
@@ -92,10 +102,10 @@ export default function DropZone({
         <div className="flex flex-col items-center justify-center">
           <Upload className="w-8 h-8 text-gray-400 mb-3" />
           <p className="text-sm font-medium text-gray-800">
-            Drag and drop your PDF(s) here
+            Drag and drop your PDF or Word document(s) here
           </p>
           <p className="text-xs text-gray-500 mt-1 mb-5">
-            Single or multiple PDF files supported
+            Supported formats: PDF, DOCX, DOC
           </p>
 
           <div className="flex items-center gap-3">
@@ -105,7 +115,7 @@ export default function DropZone({
               type="button"
               className="px-4 py-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded transition-colors"
             >
-              Select PDF(s)
+              Select Documents
             </button>
 
             <span className="text-xs text-gray-400">or</span>

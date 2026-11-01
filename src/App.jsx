@@ -17,8 +17,14 @@ import { applyPdfModifications } from './utils/pdfModifier';
 import { exportToDocx } from './utils/docxExporter';
 import { clonePdfBytes } from './utils/pdfSetup';
 import { applyFixedToSections } from './utils/identityHelper';
+import {
+  isWordDocument,
+  parseAndBifurcateDocx,
+  modifyDocxBytes,
+  renderSectionsToPdf,
+} from './utils/docxParser';
 
-export function computeDocName(sections, originalName) {
+export function computeDocName(sections, originalName, ext = '.pdf') {
   let nameVal = 'Student';
   let rollVal = 'Roll';
   let expVal = '';
@@ -32,14 +38,16 @@ export function computeDocName(sections, originalName) {
     });
   }
 
+  const extension = ext.startsWith('.') ? ext : `.${ext}`;
+
   if (expVal) {
-    return `${expVal}_Roll${rollVal}_${nameVal}.pdf`;
+    return `${expVal}_Roll${rollVal}_${nameVal}${extension}`;
   }
   if (originalName) {
-    const base = originalName.replace(/\.pdf$/i, '');
-    return `${base}_Roll${rollVal}_${nameVal}.pdf`;
+    const base = originalName.replace(/\.(pdf|docx?)$/i, '');
+    return `${base}_Roll${rollVal}_${nameVal}${extension}`;
   }
-  return `Document_Roll${rollVal}_${nameVal}.pdf`;
+  return `Document_Roll${rollVal}_${nameVal}${extension}`;
 }
 
 export default function App() {
@@ -73,34 +81,67 @@ export default function App() {
   }, [activeDocIndex]);
 
 
-  // Process a single file into a document object
+  // Process a single file (PDF or Word DOCX) into a document object
   const processFileToDoc = async (file, currentFixed) => {
+    const isDocx = isWordDocument(file);
     const arrayBuffer = await file.arrayBuffer();
-    const masterBytes = new Uint8Array(arrayBuffer);
-    const parsed = await parseAndBifurcatePdf(clonePdfBytes(masterBytes));
 
-    let finalSections = parsed.sections;
-    let finalModBytes = clonePdfBytes(masterBytes);
+    if (isDocx) {
+      const parsed = await parseAndBifurcateDocx(arrayBuffer, file.name);
+      let finalSections = parsed.sections;
 
-    if (currentFixed?.name && currentFixed.autoApply !== false) {
-      finalSections = applyFixedToSections(parsed.sections, currentFixed);
-      try {
-        const mod = await applyPdfModifications(clonePdfBytes(masterBytes), finalSections, []);
-        finalModBytes = clonePdfBytes(mod);
-      } catch (err) {
-        console.error('Error applying initial modifications to ' + file.name, err);
+      if (currentFixed?.name && currentFixed.autoApply !== false) {
+        finalSections = applyFixedToSections(parsed.sections, currentFixed);
       }
-    }
 
-    return {
-      id: `doc_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
-      fileName: file.name,
-      originalBytes: clonePdfBytes(masterBytes),
-      modifiedBytes: finalModBytes,
-      numPages: parsed.numPages,
-      sections: finalSections,
-      customReplacements: [],
-    };
+      const { pdfBytes, numPages } = await renderSectionsToPdf(finalSections);
+      let modDocxBytes = null;
+      try {
+        modDocxBytes = await modifyDocxBytes(arrayBuffer, finalSections);
+      } catch (e) {
+        console.error('Error creating modified docx bytes:', e);
+      }
+
+      return {
+        id: `doc_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+        fileName: file.name,
+        docType: 'docx',
+        originalDocxBytes: arrayBuffer,
+        modifiedDocxBytes: modDocxBytes || arrayBuffer,
+        originalBytes: clonePdfBytes(pdfBytes),
+        modifiedBytes: clonePdfBytes(pdfBytes),
+        numPages,
+        sections: finalSections,
+        customReplacements: [],
+      };
+    } else {
+      const masterBytes = new Uint8Array(arrayBuffer);
+      const parsed = await parseAndBifurcatePdf(clonePdfBytes(masterBytes));
+
+      let finalSections = parsed.sections;
+      let finalModBytes = clonePdfBytes(masterBytes);
+
+      if (currentFixed?.name && currentFixed.autoApply !== false) {
+        finalSections = applyFixedToSections(parsed.sections, currentFixed);
+        try {
+          const mod = await applyPdfModifications(clonePdfBytes(masterBytes), finalSections, []);
+          finalModBytes = clonePdfBytes(mod);
+        } catch (err) {
+          console.error('Error applying initial modifications to ' + file.name, err);
+        }
+      }
+
+      return {
+        id: `doc_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+        fileName: file.name,
+        docType: 'pdf',
+        originalBytes: clonePdfBytes(masterBytes),
+        modifiedBytes: finalModBytes,
+        numPages: parsed.numPages,
+        sections: finalSections,
+        customReplacements: [],
+      };
+    }
   };
 
   // Load sample lab manual
@@ -415,33 +456,59 @@ export default function App() {
     handleApplyChanges();
   };
 
-  // Apply changes to active document
+  // Apply changes to active document (handles both PDF and DOCX)
   const handleApplyChanges = async () => {
-    if (!pdfBuffer || !sections) return;
+    if (!activeDoc || !sections) return;
     try {
       setIsExporting(true);
-      const modifiedBytes = await applyPdfModifications(
-        clonePdfBytes(pdfBuffer),
-        sections,
-        customReplacements
-      );
 
-      const safeModified = clonePdfBytes(modifiedBytes);
-      setDocuments((prev) =>
-        prev.map((doc, idx) =>
-          idx === activeDocIndex ? { ...doc, modifiedBytes: safeModified } : doc
-        )
-      );
+      if (activeDoc.docType === 'docx') {
+        const { pdfBytes } = await renderSectionsToPdf(sections);
+        let modDocx = null;
+        try {
+          modDocx = await modifyDocxBytes(
+            activeDoc.originalDocxBytes,
+            sections,
+            customReplacements
+          );
+        } catch (e) {
+          console.error('Error modifying docx bytes:', e);
+        }
+
+        setDocuments((prev) =>
+          prev.map((doc, idx) =>
+            idx === activeDocIndex
+              ? {
+                  ...doc,
+                  modifiedBytes: clonePdfBytes(pdfBytes),
+                  modifiedDocxBytes: modDocx || doc.modifiedDocxBytes,
+                }
+              : doc
+          )
+        );
+      } else {
+        const modifiedBytes = await applyPdfModifications(
+          clonePdfBytes(pdfBuffer),
+          sections,
+          customReplacements
+        );
+        const safeModified = clonePdfBytes(modifiedBytes);
+        setDocuments((prev) =>
+          prev.map((doc, idx) =>
+            idx === activeDocIndex ? { ...doc, modifiedBytes: safeModified } : doc
+          )
+        );
+      }
 
       // Collect changes for celebration toast
       const diffs = [];
       if (sections.personalTags) {
         sections.personalTags.forEach((t) => {
-          if (t.currentValue !== t.originalValue) {
+          if (t.currentValue !== t.originalValue || t.isRemoved) {
             diffs.push({
               label: t.label || t.key,
               from: t.originalValue || '(empty)',
-              to: t.currentValue,
+              to: t.isRemoved ? '(Removed)' : t.currentValue,
             });
           }
         });
@@ -450,14 +517,14 @@ export default function App() {
       setCelebrationChanges(diffs);
       setShowCelebration(true);
     } catch (err) {
-      console.error('Error applying pdf modifications:', err);
-      alert('Could not update PDF: ' + err.message);
+      console.error('Error applying modifications:', err);
+      alert('Could not update document: ' + err.message);
     } finally {
       setIsExporting(false);
     }
   };
 
-  // Apply Fixed Identity across ALL loaded documents
+  // Apply Fixed Identity across ALL loaded documents (both PDF and DOCX)
   const handleApplyFixedToAll = async () => {
     const currentFixed = fixedIdentity || getSavedFixedIdentity();
     if (!currentFixed?.name) {
@@ -473,15 +540,27 @@ export default function App() {
       for (let i = 0; i < documents.length; i++) {
         const doc = documents[i];
         const updatedSecs = applyFixedToSections(doc.sections, currentFixed);
+
         let newModBytes = doc.modifiedBytes;
+        let newDocxBytes = doc.modifiedDocxBytes;
 
         try {
-          const mod = await applyPdfModifications(
-            clonePdfBytes(doc.originalBytes),
-            updatedSecs,
-            doc.customReplacements || []
-          );
-          newModBytes = clonePdfBytes(mod);
+          if (doc.docType === 'docx') {
+            const { pdfBytes } = await renderSectionsToPdf(updatedSecs);
+            newModBytes = clonePdfBytes(pdfBytes);
+            newDocxBytes = await modifyDocxBytes(
+              doc.originalDocxBytes,
+              updatedSecs,
+              doc.customReplacements || []
+            );
+          } else {
+            const mod = await applyPdfModifications(
+              clonePdfBytes(doc.originalBytes),
+              updatedSecs,
+              doc.customReplacements || []
+            );
+            newModBytes = clonePdfBytes(mod);
+          }
         } catch (err) {
           console.error(`Error updating document ${doc.fileName}:`, err);
         }
@@ -490,6 +569,7 @@ export default function App() {
           ...doc,
           sections: updatedSecs,
           modifiedBytes: newModBytes,
+          modifiedDocxBytes: newDocxBytes || doc.modifiedDocxBytes,
         });
       }
 
@@ -516,15 +596,27 @@ export default function App() {
         for (let i = 0; i < documents.length; i++) {
           const doc = documents[i];
           const updatedSecs = applyFixedToSections(doc.sections, newFixed);
+
           let newModBytes = doc.modifiedBytes;
+          let newDocxBytes = doc.modifiedDocxBytes;
 
           try {
-            const mod = await applyPdfModifications(
-              clonePdfBytes(doc.originalBytes),
-              updatedSecs,
-              doc.customReplacements || []
-            );
-            newModBytes = clonePdfBytes(mod);
+            if (doc.docType === 'docx') {
+              const { pdfBytes } = await renderSectionsToPdf(updatedSecs);
+              newModBytes = clonePdfBytes(pdfBytes);
+              newDocxBytes = await modifyDocxBytes(
+                doc.originalDocxBytes,
+                updatedSecs,
+                doc.customReplacements || []
+              );
+            } else {
+              const mod = await applyPdfModifications(
+                clonePdfBytes(doc.originalBytes),
+                updatedSecs,
+                doc.customReplacements || []
+              );
+              newModBytes = clonePdfBytes(mod);
+            }
           } catch (e) {
             console.error(e);
           }
@@ -533,6 +625,7 @@ export default function App() {
             ...doc,
             sections: updatedSecs,
             modifiedBytes: newModBytes,
+            modifiedDocxBytes: newDocxBytes || doc.modifiedDocxBytes,
           });
         }
 
@@ -551,16 +644,26 @@ export default function App() {
 
   // Download active document as PDF
   const handleDownloadPdf = async (customName) => {
-    if (!pdfBuffer || !sections) return;
+    if (!activeDoc || !sections) return;
     try {
       setIsExporting(true);
-      const modifiedBytes = await applyPdfModifications(
-        clonePdfBytes(pdfBuffer),
-        sections,
-        customReplacements
-      );
-      const safeDownloadBytes = clonePdfBytes(modifiedBytes);
-      const blob = new Blob([safeDownloadBytes], { type: 'application/pdf' });
+      let safeBytes = activeDoc.modifiedBytes || activeDoc.originalBytes;
+
+      if (!safeBytes) {
+        if (activeDoc.docType === 'docx') {
+          const { pdfBytes } = await renderSectionsToPdf(sections);
+          safeBytes = clonePdfBytes(pdfBytes);
+        } else {
+          const mod = await applyPdfModifications(
+            clonePdfBytes(activeDoc.originalBytes),
+            sections,
+            customReplacements
+          );
+          safeBytes = clonePdfBytes(mod);
+        }
+      }
+
+      const blob = new Blob([clonePdfBytes(safeBytes)], { type: 'application/pdf' });
       const outName = customName.endsWith('.pdf') ? customName : `${customName}.pdf`;
       saveAs(blob, outName);
     } catch (err) {
@@ -573,10 +676,29 @@ export default function App() {
 
   // Download active document as Word (.docx)
   const handleDownloadDocx = async (customName) => {
-    if (!sections) return;
+    if (!activeDoc || !sections) return;
     try {
       setIsExporting(true);
       const outName = customName.endsWith('.docx') ? customName : `${customName}.docx`;
+
+      if (activeDoc.docType === 'docx' && activeDoc.originalDocxBytes) {
+        let docxData = activeDoc.modifiedDocxBytes;
+        if (!docxData) {
+          docxData = await modifyDocxBytes(
+            activeDoc.originalDocxBytes,
+            sections,
+            customReplacements
+          );
+        }
+        if (docxData) {
+          const blob = new Blob([docxData], {
+            type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          });
+          saveAs(blob, outName);
+          return;
+        }
+      }
+
       await exportToDocx(sections, outName);
     } catch (err) {
       console.error('Error exporting docx:', err);
@@ -596,28 +718,56 @@ export default function App() {
 
       for (let i = 0; i < documents.length; i++) {
         const doc = documents[i];
-        let finalBytes = doc.modifiedBytes;
 
-        if (!finalBytes) {
-          finalBytes = await applyPdfModifications(
-            clonePdfBytes(doc.originalBytes),
-            doc.sections,
-            doc.customReplacements || []
-          );
-        }
-
-        let outName = computeDocName(doc.sections, doc.fileName);
-        if (usedNames.has(outName)) {
-          let count = 2;
-          const base = outName.replace(/\.pdf$/i, '');
-          while (usedNames.has(`${base}_(${count}).pdf`)) {
-            count++;
+        if (doc.docType === 'docx') {
+          // Add modified docx file
+          const docxName = computeDocName(doc.sections, doc.fileName, '.docx');
+          let docxData = doc.modifiedDocxBytes;
+          if (!docxData && doc.originalDocxBytes) {
+            docxData = await modifyDocxBytes(
+              doc.originalDocxBytes,
+              doc.sections,
+              doc.customReplacements || []
+            );
           }
-          outName = `${base}_(${count}).pdf`;
-        }
-        usedNames.add(outName);
+          if (docxData) {
+            zip.file(docxName, docxData);
+          }
 
-        zip.file(outName, clonePdfBytes(finalBytes));
+          // Also add converted PDF
+          const pdfName = computeDocName(doc.sections, doc.fileName, '.pdf');
+          let pdfData = doc.modifiedBytes;
+          if (!pdfData) {
+            const { pdfBytes } = await renderSectionsToPdf(doc.sections);
+            pdfData = pdfBytes;
+          }
+          if (pdfData) {
+            zip.file(pdfName, clonePdfBytes(pdfData));
+          }
+        } else {
+          // Standard PDF
+          let finalBytes = doc.modifiedBytes;
+          if (!finalBytes) {
+            finalBytes = await applyPdfModifications(
+              clonePdfBytes(doc.originalBytes),
+              doc.sections,
+              doc.customReplacements || []
+            );
+          }
+
+          let outName = computeDocName(doc.sections, doc.fileName, '.pdf');
+          if (usedNames.has(outName)) {
+            let count = 2;
+            const base = outName.replace(/\.pdf$/i, '');
+            while (usedNames.has(`${base}_(${count}).pdf`)) {
+              count++;
+            }
+            outName = `${base}_(${count}).pdf`;
+          }
+          usedNames.add(outName);
+
+          zip.file(outName, clonePdfBytes(finalBytes));
+        }
       }
 
       const zipBlob = await zip.generateAsync({ type: 'blob' });
