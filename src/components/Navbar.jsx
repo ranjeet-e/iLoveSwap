@@ -9,12 +9,15 @@ import {
   FileCheck2,
   SlidersHorizontal,
   ExternalLink,
+  ShieldCheck,
 } from 'lucide-react';
 
 export default function Navbar({
   onLoadSample,
   onReset,
   onOpenGuide,
+  onOpenFixedIdentity,
+  fixedIdentity,
   hasDocument,
   fileName,
   sectionsCount,
@@ -68,6 +71,25 @@ export default function Navbar({
 
         {/* Right Action Buttons */}
         <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+          {/* Fixed Identity Permanent Button */}
+          <button
+            onClick={onOpenFixedIdentity}
+            type="button"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs border bg-white hover:bg-slate-50 border-slate-200"
+            title="Set permanent author details that auto-replace across every uploaded PDF"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-red-600" />
+            {fixedIdentity?.name ? (
+              <span className="font-bold text-slate-800 truncate max-w-[150px]">
+                Fixed: {fixedIdentity.name}
+              </span>
+            ) : (
+              <span className="font-bold text-slate-800">
+                Fixed Identity <span className="text-[10px] text-red-600 font-extrabold">(PERMANENT)</span>
+              </span>
+            )}
+          </button>
+
           <button
             onClick={onLoadSample}
             type="button"

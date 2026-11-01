@@ -8,6 +8,7 @@ import PdfViewer from './components/PdfViewer';
 import ExportBar from './components/ExportBar';
 import YuppyCelebration from './components/YuppyCelebration';
 import ExtensionGuideModal from './components/ExtensionGuideModal';
+import FixedIdentityModal, { getSavedFixedIdentity } from './components/FixedIdentityModal';
 
 import { parseAndBifurcatePdf } from './utils/pdfParser';
 import { applyPdfModifications } from './utils/pdfModifier';
@@ -25,11 +26,39 @@ export default function App() {
   const [customReplacements, setCustomReplacements] = useState([]);
   const [highlightedItemId, setHighlightedItemId] = useState(null);
 
+  const [fixedIdentity, setFixedIdentity] = useState(() => getSavedFixedIdentity());
+  const [showFixedIdentityModal, setShowFixedIdentityModal] = useState(false);
+
   const [isLoading, setIsLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
   const [celebrationChanges, setCelebrationChanges] = useState([]);
   const [showGuideModal, setShowGuideModal] = useState(false);
+
+  // Helper to map fixed identity fields onto personal tags
+  const applyFixedToSections = (secList, fixed) => {
+    if (!fixed || !fixed.name || !secList?.personalTags) return secList;
+    const updatedTags = secList.personalTags.map((tag) => {
+      const k = (tag.key || '').toLowerCase();
+      const l = (tag.label || '').toLowerCase();
+      let newVal = tag.currentValue;
+
+      if (k.includes('name') || l.includes('name')) {
+        if (fixed.name) newVal = fixed.name;
+      } else if (k.includes('roll') || l.includes('roll')) {
+        if (fixed.rollNo) newVal = fixed.rollNo;
+      } else if (k.includes('batch') || l.includes('batch')) {
+        if (fixed.batch) newVal = fixed.batch;
+      } else if (k.includes('div') || k.includes('class') || l.includes('div')) {
+        if (fixed.division) newVal = fixed.division;
+      } else if (k.includes('prn') || l.includes('prn') || k.includes('sap')) {
+        if (fixed.prn) newVal = fixed.prn;
+      }
+      return { ...tag, currentValue: newVal };
+    });
+
+    return { ...secList, personalTags: updatedTags };
+  };
 
   // Load sample lab manual
   const loadSamplePdf = async () => {
@@ -44,8 +73,22 @@ export default function App() {
       setModifiedPdfBuffer(clonePdfBytes(masterBytes));
 
       const parsed = await parseAndBifurcatePdf(clonePdfBytes(masterBytes));
+      let finalSections = parsed.sections;
+
+      // Auto-apply Fixed Identity if present and enabled
+      const currentFixed = fixedIdentity || getSavedFixedIdentity();
+      if (currentFixed?.name && currentFixed.autoApply !== false) {
+        finalSections = applyFixedToSections(parsed.sections, currentFixed);
+        try {
+          const modBytes = await applyPdfModifications(clonePdfBytes(masterBytes), finalSections);
+          setModifiedPdfBuffer(clonePdfBytes(modBytes));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
       setNumPages(parsed.numPages);
-      setSections(parsed.sections);
+      setSections(finalSections);
       setCurrentPage(1);
     } catch (err) {
       console.error('Error loading sample pdf:', err);
@@ -67,8 +110,22 @@ export default function App() {
       setModifiedPdfBuffer(clonePdfBytes(masterBytes));
 
       const parsed = await parseAndBifurcatePdf(clonePdfBytes(masterBytes));
+      let finalSections = parsed.sections;
+
+      // Auto-apply Fixed Identity if present and enabled
+      const currentFixed = fixedIdentity || getSavedFixedIdentity();
+      if (currentFixed?.name && currentFixed.autoApply !== false) {
+        finalSections = applyFixedToSections(parsed.sections, currentFixed);
+        try {
+          const modBytes = await applyPdfModifications(clonePdfBytes(masterBytes), finalSections);
+          setModifiedPdfBuffer(clonePdfBytes(modBytes));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
       setNumPages(parsed.numPages);
-      setSections(parsed.sections);
+      setSections(finalSections);
       setCurrentPage(1);
     } catch (err) {
       console.error('Error parsing uploaded pdf:', err);
@@ -243,6 +300,41 @@ export default function App() {
     setFileName('');
   };
 
+  // Save new fixed identity from modal & apply immediately
+  const handleSaveFixedIdentity = async (newFixed) => {
+    setFixedIdentity(newFixed);
+    if (pdfBuffer && sections) {
+      const updatedSecs = applyFixedToSections(sections, newFixed);
+      setSections(updatedSecs);
+      try {
+        const modBytes = await applyPdfModifications(
+          clonePdfBytes(pdfBuffer),
+          updatedSecs,
+          customReplacements
+        );
+        setModifiedPdfBuffer(clonePdfBytes(modBytes));
+
+        // Diff for celebration toast
+        const diffs = [];
+        if (updatedSecs.personalTags) {
+          updatedSecs.personalTags.forEach((t) => {
+            if (t.currentValue !== t.originalValue) {
+              diffs.push({
+                label: t.label || t.key,
+                from: t.originalValue || '(empty)',
+                to: t.currentValue,
+              });
+            }
+          });
+        }
+        setCelebrationChanges(diffs);
+        setShowCelebration(true);
+      } catch (e) {
+        console.error('Error applying fixed identity:', e);
+      }
+    }
+  };
+
   // Keyboard shortcut listener: Cmd/Ctrl + S to apply changes
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -273,6 +365,8 @@ export default function App() {
         onLoadSample={loadSamplePdf}
         onReset={handleReset}
         onOpenGuide={() => setShowGuideModal(true)}
+        onOpenFixedIdentity={() => setShowFixedIdentityModal(true)}
+        fixedIdentity={fixedIdentity}
         hasDocument={!!pdfBuffer}
         fileName={fileName}
         sectionsCount={sectionsCount}
@@ -286,6 +380,8 @@ export default function App() {
             onFileSelected={handleFileSelected}
             onLoadSample={loadSamplePdf}
             isLoading={isLoading}
+            fixedIdentity={fixedIdentity}
+            onOpenFixedIdentityModal={() => setShowFixedIdentityModal(true)}
           />
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -299,6 +395,8 @@ export default function App() {
                 onRemoveTag={handleRemoveTag}
                 onApplyChanges={handleApplyChanges}
                 onHighlightItem={setHighlightedItemId}
+                fixedIdentity={fixedIdentity}
+                onOpenFixedIdentityModal={() => setShowFixedIdentityModal(true)}
               />
 
               {/* Bifurcated Sections Navigator */}
@@ -349,6 +447,13 @@ export default function App() {
       {showGuideModal && (
         <ExtensionGuideModal onClose={() => setShowGuideModal(false)} />
       )}
+
+      {/* Fixed Identity Permanent Settings Modal (From Screenshot!) */}
+      <FixedIdentityModal
+        isOpen={showFixedIdentityModal}
+        onClose={() => setShowFixedIdentityModal(false)}
+        onSave={handleSaveFixedIdentity}
+      />
     </div>
   );
 }

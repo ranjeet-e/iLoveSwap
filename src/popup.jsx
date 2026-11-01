@@ -15,14 +15,19 @@ import {
 import './index.css';
 
 function PopupApp() {
-  const [name, setName] = useState('ranjeet epili');
-  const [rollNo, setRollNo] = useState('12');
+  const [name, setName] = useState('Om Bhalerao');
+  const [rollNo, setRollNo] = useState('02');
   const [batch, setBatch] = useState('B1');
   const [division, setDivision] = useState('SYECS2');
+  const [prn, setPrn] = useState('125BTEC1158');
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    const raw = localStorage.getItem('iloveswap_saved_profile') || localStorage.getItem('ilvescam_saved_profile') || localStorage.getItem('easeway_saved_profile');
+    const raw =
+      localStorage.getItem('iloveswap_fixed_identity') ||
+      localStorage.getItem('iloveswap_saved_profile') ||
+      localStorage.getItem('ilvescam_saved_profile') ||
+      localStorage.getItem('easeway_saved_profile');
     if (raw) {
       try {
         const p = JSON.parse(raw);
@@ -30,20 +35,23 @@ function PopupApp() {
         if (p.rollNo || p.Roll || p['Roll No']) setRollNo(p.rollNo || p.Roll || p['Roll No']);
         if (p.batch || p.Batch) setBatch(p.batch || p.Batch);
         if (p.division || p.Division) setDivision(p.division || p.Division);
+        if (p.prn || p.PRN) setPrn(p.prn || p.PRN);
       } catch (e) {}
     }
   }, []);
 
   const handleSaveProfile = () => {
-    localStorage.setItem(
-      'iloveswap_saved_profile',
-      JSON.stringify({
-        name,
-        'Roll No': rollNo,
-        batch,
-        division,
-      })
-    );
+    const data = {
+      name,
+      rollNo,
+      batch,
+      division,
+      prn,
+      autoApply: true,
+      updatedAt: new Date().toISOString(),
+    };
+    localStorage.setItem('iloveswap_fixed_identity', JSON.stringify(data));
+    localStorage.setItem('iloveswap_saved_profile', JSON.stringify(data));
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -149,6 +157,19 @@ function PopupApp() {
                 className="w-full bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200 font-bold text-slate-900 outline-hidden focus:border-red-500 mt-1"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+              PRN / SAP ID
+            </label>
+            <input
+              type="text"
+              value={prn}
+              onChange={(e) => setPrn(e.target.value)}
+              placeholder="e.g. 125BTEC1158"
+              className="w-full bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200 font-bold text-slate-900 outline-hidden focus:border-red-500 mt-1"
+            />
           </div>
 
           <button

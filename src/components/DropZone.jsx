@@ -10,10 +10,16 @@ import {
   CheckCircle2,
   Zap,
   Building,
-  GraduationCap,
+  Settings,
 } from 'lucide-react';
 
-export default function DropZone({ onFileSelected, onLoadSample, isLoading }) {
+export default function DropZone({
+  onFileSelected,
+  onLoadSample,
+  isLoading,
+  fixedIdentity,
+  onOpenFixedIdentityModal,
+}) {
   const fileInputRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -67,6 +73,39 @@ export default function DropZone({ onFileSelected, onLoadSample, isLoading }) {
         <p className="mt-3.5 text-sm sm:text-base text-slate-600 max-w-2xl mx-auto leading-relaxed">
           Drop any PDF lab manual, assignment, or project journal. <b>iLoveSwap</b> automatically chunk-bifurcates the document into sections — isolating student details, headers, questions, codes, and conclusions so you can replace them effortlessly!
         </p>
+      </div>
+
+      {/* Fixed Identity Permanent Status Bar */}
+      <div className="mb-6 flex justify-center">
+        {fixedIdentity?.name ? (
+          <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-2xl bg-white border border-slate-200/90 shadow-2xs text-xs">
+            <span className="p-1 rounded-lg bg-emerald-50 text-emerald-600">
+              <ShieldCheck className="w-4 h-4" />
+            </span>
+            <span className="text-slate-600">
+              Permanent Identity Active: <b className="text-slate-900">{fixedIdentity.name}</b> (Roll {fixedIdentity.rollNo || '-'}, {fixedIdentity.division || '-'})
+            </span>
+            <button
+              type="button"
+              onClick={onOpenFixedIdentityModal}
+              className="ml-1 text-[11px] font-bold text-red-600 hover:text-red-700 underline cursor-pointer"
+            >
+              Change
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={onOpenFixedIdentityModal}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200/90 shadow-2xs text-xs font-bold text-slate-700 transition-all cursor-pointer hover:border-red-300"
+          >
+            <ShieldCheck className="w-4 h-4 text-red-600" />
+            <span>Set Your Fixed Identity Once (Permanent)</span>
+            <span className="text-[10px] bg-red-100 text-red-700 font-extrabold px-1.5 py-0.2 rounded-md">
+              PERMANENT
+            </span>
+          </button>
+        )}
       </div>
 
       {/* Main Upload Box (iLovePDF Modernized) */}

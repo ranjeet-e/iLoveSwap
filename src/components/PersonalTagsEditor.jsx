@@ -16,6 +16,8 @@ import {
   RotateCcw,
   Copy,
   Check,
+  ShieldCheck,
+  Settings,
 } from 'lucide-react';
 
 export default function PersonalTagsEditor({
@@ -25,12 +27,41 @@ export default function PersonalTagsEditor({
   onRemoveTag,
   onApplyChanges,
   onHighlightItem,
+  fixedIdentity,
+  onOpenFixedIdentityModal,
 }) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newTagLabel, setNewTagLabel] = useState('');
   const [newTagValue, setNewTagValue] = useState('');
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
+
+  // Apply Fixed Identity (From Permanent Settings modal!)
+  const applyFixedIdentity = () => {
+    if (!fixedIdentity || !fixedIdentity.name) {
+      onOpenFixedIdentityModal?.();
+      return;
+    }
+
+    personalTags.forEach((tag) => {
+      const key = (tag.key || '').toLowerCase();
+      const label = (tag.label || '').toLowerCase();
+
+      if (key.includes('name') || label.includes('name')) {
+        if (fixedIdentity.name) onTagChange(tag.id, fixedIdentity.name);
+      } else if (key.includes('roll') || label.includes('roll')) {
+        if (fixedIdentity.rollNo) onTagChange(tag.id, fixedIdentity.rollNo);
+      } else if (key.includes('batch') || label.includes('batch')) {
+        if (fixedIdentity.batch) onTagChange(tag.id, fixedIdentity.batch);
+      } else if (key.includes('division') || key.includes('class') || label.includes('div')) {
+        if (fixedIdentity.division) onTagChange(tag.id, fixedIdentity.division);
+      } else if (key.includes('prn') || label.includes('prn') || key.includes('sap')) {
+        if (fixedIdentity.prn) onTagChange(tag.id, fixedIdentity.prn);
+      }
+    });
+
+    onApplyChanges?.();
+  };
 
   // Quick preset: Ranjeet Epili's details (from user's prompt!)
   const applyRanjeetPreset = () => {
@@ -164,8 +195,67 @@ export default function PersonalTagsEditor({
           Isolated metadata tags detected on Page 1. Update your name, roll no, batch, and division below.
         </p>
 
+        {/* Permanent Fixed Identity Banner (From User's Screenshot!) */}
+        {fixedIdentity?.name ? (
+          <div className="mt-3.5 p-3 sm:p-3.5 rounded-2xl bg-gradient-to-r from-red-500/10 via-rose-500/10 to-transparent border border-red-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-red-600 to-rose-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs sm:text-sm font-black text-slate-900">
+                    {fixedIdentity.name}
+                  </span>
+                  <span className="text-[9px] font-black uppercase tracking-wider bg-red-100 text-red-700 px-1.5 py-0.5 rounded-md border border-red-200">
+                    PERMANENT
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-0.5 font-medium">
+                  Roll: <b className="text-slate-700">{fixedIdentity.rollNo || '-'}</b> • Batch: <b className="text-slate-700">{fixedIdentity.batch || '-'}</b> • Div: <b className="text-slate-700">{fixedIdentity.division || '-'}</b> • PRN: <b className="text-slate-700">{fixedIdentity.prn || '-'}</b>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={applyFixedIdentity}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black text-white bg-gradient-to-r from-red-600 via-rose-600 to-red-600 hover:from-red-700 hover:to-rose-700 shadow-sm transition-all cursor-pointer active:scale-98"
+                title="1-Click replace original author with your fixed identity"
+              >
+                <Zap className="w-3.5 h-3.5 fill-current" />
+                <span>Apply Fixed Details</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onOpenFixedIdentityModal}
+                className="p-1.5 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-white border border-transparent hover:border-slate-200 transition-all cursor-pointer"
+                title="Edit Fixed Identity Settings"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={onOpenFixedIdentityModal}
+            className="mt-3.5 w-full p-3 rounded-2xl bg-gradient-to-r from-red-50 via-rose-50 to-white border border-red-200 hover:border-red-300 transition-all flex items-center justify-between text-xs font-bold text-red-700 cursor-pointer shadow-2xs hover:shadow-xs"
+          >
+            <span className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-red-600" />
+              <span>Set Up Fixed Identity Settings (Save Name Permanently)</span>
+            </span>
+            <span className="text-[10px] bg-red-600 text-white font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+              PERMANENT
+            </span>
+          </button>
+        )}
+
         {/* Quick Presets Bar */}
-        <div className="mt-4 flex items-center gap-2 flex-wrap">
+        <div className="mt-3.5 flex items-center gap-2 flex-wrap">
           <button
             onClick={applyRanjeetPreset}
             type="button"
