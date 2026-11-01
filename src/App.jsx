@@ -359,7 +359,7 @@ export default function App() {
     : 0;
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col selection:bg-red-500 selection:text-white bg-grid-pattern">
+    <div className="min-h-screen bg-gray-50 flex flex-col selection:bg-red-500 selection:text-white">
       {/* Top Navbar */}
       <Navbar
         onLoadSample={loadSamplePdf}
