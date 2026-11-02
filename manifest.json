@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "iLoveSwap - Smart PDF Bifurcator & Tag Editor",
+  "name": "iLoveSwap - Academic Document Standardizer",
   "version": "1.0.0",
-  "description": "Smart PDF chunking and section editor like iLovePDF. Detects Name, Roll No, Batch, Division, PRN and allows instant section modification and PDF/DOCX export.",
+  "description": "Academic document formatting and standardization tool for lab manuals and reports. Created by Ranjeet Epili.",
+  "author": "Ranjeet Epili",
   "action": {
     "default_popup": "popup.html",
     "default_title": "iLoveSwap Quick Editor",

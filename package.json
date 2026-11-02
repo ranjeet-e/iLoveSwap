@@ -1,15 +1,20 @@
 {
   "name": "ilove-swap",
   "version": "1.0.0",
-  "description": "iLoveSwap - Smart Lab Manual & Document Section Bifurcator and Personal Tag Editor",
+  "description": "iLoveSwap - Academic Document Standardization & Formatting Utility by Ranjeet Epili",
   "main": "index.js",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "academic-formatter",
+    "pdf-editor",
+    "docx-formatter",
+    "lab-manual-standardizer"
+  ],
+  "author": "Ranjeet Epili",
   "license": "ISC",
   "type": "module",
   "dependencies": {

@@ -15,9 +15,14 @@ export default function Navbar({
     <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <span className="text-lg font-bold tracking-tight text-gray-900">
-            iLove<span className="text-red-600">Swap</span>
-          </span>
+          <div className="flex items-baseline gap-2">
+            <span className="text-lg font-bold tracking-tight text-gray-900">
+              iLove<span className="text-red-600">Swap</span>
+            </span>
+            <span className="hidden sm:inline text-[11px] text-gray-400 font-medium">
+              by <span className="text-gray-600 font-semibold">Ranjeet Epili</span>
+            </span>
+          </div>
 
           {hasDocument && (
             <span className="hidden sm:inline text-xs text-gray-500 border-l border-gray-200 pl-3 truncate max-w-xs">

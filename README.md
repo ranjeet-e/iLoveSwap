@@ -1,96 +1,113 @@
-# iLoveSwap - Smart Document Section Bifurcator & Identity Editor
+# iLoveSwap - Academic Document Standardization & Formatting Utility
 
-A high-performance web application and Chrome Extension designed for academic reports, lab manuals, and assignments. Automatically parses PDF and Microsoft Word (`.docx`) documents into semantic sections, isolates student identity tags (Name, Roll No, Batch, Division, PRN), enables direct on-page editing or line removal, and exports to customized PDF, Word, or ZIP packages.
+> **Created with precision by [Ranjeet Epili](https://github.com/ranjeet-e)**  
+> *A privacy-first, client-side academic document formatter and template standardization tool.*
 
 ---
 
-## Architecture & Directory Structure
+## 🎯 Purpose & Ethical Mission
+
+In academic institutions and universities, students, lab assistants, and instructors frequently manage dozens of laboratory reports, assignments, and practical manuals every semester. These submissions demand strict adherence to departmental cover formats, batch classifications, and identification headers.
+
+Traditionally, making necessary administrative updates—such as correcting typographical errors in roll numbers, aligning division tags, or adjusting academic year headers—required cumbersome re-typing or third-party web tools that frequently distort MATLAB plots, mathematical equations, and code formatting.
+
+**iLoveSwap was engineered by Ranjeet Epili to solve this administrative challenge ethically and securely:**
+
+1. **Academic Template Standardization**: Enables students and educators to maintain uniform, professional departmental report templates across batches and courses without altering or corrupting original scientific findings, code blocks, or graphs.
+2. **Administrative Correction & Accuracy**: Allows instant correction of personal academic identifiers (Student Name, Roll Number, Batch, Division, and PRN/SAP ID) across batches of documents, ensuring accurate record-keeping and grade attribution.
+3. **Privacy & Security by Design (Zero-Knowledge Architecture)**: Unlike commercial online converters that upload private academic reports to external servers, **iLoveSwap operates 100% locally in the client browser**. No documents, personal data, or coursework ever leave the user's device or touch an external server.
+4. **Preservation of Educational Content**: Uses lossless XML and PDF manipulation engines to ensure program code blocks, circuit schematics, vector graphs, and output results remain untouched during header and identification updates.
+
+---
+
+## 🛡️ Academic Integrity Statement
+
+iLoveSwap is designed exclusively as an assistive administrative and formatting utility:
+- It is intended to help students, teaching assistants, and educators streamline document preparation, standardize lab manual templates, and correct personal administrative details on their own authorized submissions.
+- It promotes organized documentation, consistent academic presentation, and data privacy.
+- Users are expected to employ this software in accordance with their respective educational institution's academic integrity policies and guidelines.
+
+---
+
+## 🏛️ Architecture & Directory Overview
 
 ```
 EaseWay/
-├── public/                       # Static public assets copied directly to dist/
-│   ├── icons/                    # Chrome extension icons (16px, 48px, 128px)
-│   ├── icon.svg                  # Vector application logo
+├── public/                       # Static assets bundled into dist/
+│   ├── icons/                    # Chrome Extension icons (16px, 48px, 128px)
+│   ├── icon.svg                  # Vector SVG application logo
 │   └── manifest.json             # Chrome Extension Manifest V3 configuration
 ├── src/
-│   ├── components/               # Modular UI components
-│   │   ├── DocumentTabs.jsx      # Multi-document tabs (PDF / Word) with batch apply
-│   │   ├── DropZone.jsx          # Drag-and-drop file upload interface
-│   │   ├── ExportBar.jsx         # Floating export toolbar with dynamic file renaming
-│   │   ├── ExtensionGuideModal.jsx # Visual setup guide for Chromium extensions
-│   │   ├── FixedIdentityModal.jsx# Global student profile configuration
-│   │   ├── Navbar.jsx            # Top application header with document stats
-│   │   ├── NotificationToast.jsx # Real-time modification confirmation toast
-│   │   ├── PdfViewer.jsx         # Interactive PDF canvas viewer with Word-mode editing
-│   │   ├── PersonalTagsEditor.jsx# Student identity fields editor with remove/restore
-│   │   └── SectionList.jsx       # Bifurcated section accordion & find-and-replace
-│   ├── utils/                    # Core processing engines
-│   │   ├── docxExporter.js       # Generates formatted Word (.docx) documents
-│   │   ├── docxParser.js         # Word (.docx) parser & in-place XML modifier
-│   │   ├── identityHelper.js     # Identity mapping & composite field handlers
-│   │   ├── pdfModifier.js        # PDF text replacement & whiteout masking engine
-│   │   ├── pdfParser.js          # Semantic section chunking & tag detector
-│   │   └── pdfSetup.js           # PDF.js worker, memory cloner & WinAnsi sanitizer
-│   ├── App.jsx                   # Central state management & document orchestration
-│   ├── index.css                 # Tailwind CSS styles & custom scrollbars
-│   ├── main.jsx                  # Web application entry point
-│   └── popup.jsx                 # Chrome Extension popup entry point
-├── dist/                         # Production build output (ready for web & extension)
-├── index.html                    # Single Page Application HTML template
-├── popup.html                    # Chrome extension popup HTML template
-├── netlify.toml                  # Netlify deployment configuration
-├── vercel.json                   # Vercel deployment configuration
-├── vite.config.js                # Vite build and multi-page bundler configuration
-└── package.json                  # Dependencies and execution scripts
+│   ├── components/                # Modular UI components
+│   │   ├── DocumentTabs.jsx       # Multi-document tabs (PDF / Word) with batch apply
+│   │   ├── DropZone.jsx           # Drag-and-drop file upload interface
+│   │   ├── ExportBar.jsx          # Floating export toolbar with dynamic file renaming
+│   │   ├── ExtensionGuideModal.jsx# Setup instructions for Chromium browsers
+│   │   ├── FixedIdentityModal.jsx # Saved student profile modal for automated auto-fill
+│   │   ├── Navbar.jsx             # Top application header with author credit
+│   │   ├── NotificationToast.jsx  # Real-time modification confirmation toast
+│   │   ├── PdfViewer.jsx          # Interactive PDF canvas viewer with Word-mode editing
+│   │   ├── PersonalTagsEditor.jsx # Student identity tags editor with remove/restore
+│   │   └── SectionList.jsx        # Bifurcated section accordion & find-and-replace
+│   ├── utils/                     # Core processing engines
+│   │   ├── docxExporter.js        # Generates structured Microsoft Word (.docx) files
+│   │   ├── docxParser.js          # Word (.docx) parser & lossless XML modifier
+│   │   ├── identityHelper.js      # Identity mapping & composite field handlers
+│   │   ├── pdfModifier.js         # PDF text replacement & whiteout masking engine
+│   │   ├── pdfParser.js           # Semantic section chunking & tag detector
+│   │   └── pdfSetup.js            # PDF.js worker, memory cloner & WinAnsi sanitizer
+│   ├── App.jsx                    # Central state management & document orchestration
+│   ├── index.css                  # Tailwind CSS styles & custom scrollbars
+│   ├── main.jsx                   # Web application entry point
+│   └── popup.jsx                  # Chrome Extension popup entry point
+├── dist/                          # Production build output (ready for web & extension)
+├── index.html                     # Web application HTML template
+├── popup.html                     # Chrome extension popup HTML template
+├── netlify.toml                   # Netlify deployment configuration
+├── vercel.json                    # Vercel deployment configuration
+├── vite.config.js                 # Multi-page bundler configuration
+└── package.json                   # Dependencies and build scripts
 ```
 
 ---
 
-## Core Capabilities
+## ⚡ Core Capabilities
 
-1. **Multi-Document Batch Processing**: Upload multiple PDF or Word (`.docx`) documents simultaneously and switch between them with document tabs.
-2. **Semantic Section Bifurcation**: Automatically detects:
-   - Institute & Department Headers
-   - Experiment Number & Aim
-   - Student Identity Tags (Name, Roll No, Batch, Division, PRN)
-   - Problem Statements & Questions
-   - Program Implementation & Code Blocks
-   - Outputs & Plot Captions
-   - Conclusions & Results
-3. **Word Mode (Direct On-Page Editing & Removal)**: Click directly on any text line in the live canvas viewer to modify content or erase lines completely with clean whiteout masking.
-4. **Fixed Identity Profiles**: Save your personal details once. Future uploads automatically substitute previous student credentials across all loaded documents.
-5. **Lossless Word Document Editing**: Modifies `word/document.xml` directly to preserve 100% of original Word tables, styling, embedded images, and layouts.
-6. **Robust WinAnsi Sanitization**: Automatically normalizes Indian Rupee symbols (`₹`), math operators, Greek letters, and smart quotes to prevent font encoding crashes in `pdf-lib`.
-7. **Batch ZIP Export**: Download individual modified PDFs, Word documents, or bundle an entire batch into an organized `.zip` file with standard academic file naming.
+- **Multi-Document Batch Processing**: Load multiple PDF or Word (`.docx`) lab manuals simultaneously and apply student details across all files in a single click.
+- **Semantic Section Bifurcation**: Automatically isolates institution headers, experiment titles, student metadata, problem questions, code snippets, outputs, and conclusions.
+- **Direct Canvas Editing ("Word Mode")**: Click directly on any text on the live rendered page to edit phrasing or erase lines with clean whiteout masking.
+- **Lossless Word Document Modification**: Directly parses and updates `word/document.xml` using `JSZip`, preserving 100% of original tables, fonts, margins, and embedded diagrams.
+- **WinAnsi Symbol Normalization**: Built-in sanitization for Indian Rupee (`₹`), mathematical operators, Greek symbols, and curly quotes, preventing PDF generation encoding errors.
+- **Flexible Academic Export**: Export individual corrected documents as PDF or Word, or download a consolidated `.zip` archive formatted with standard university naming conventions (`[Exp]_[Roll]_[Name].pdf`).
 
 ---
 
-## Quick Start (Local Development)
+## 💻 Local Development
 
 ### Prerequisites
-- Node.js (v18.0.0 or higher recommended)
+- Node.js (v18.0.0 or higher)
 - npm (v9.0.0 or higher)
 
-### Installation
+### Setup & Run
 ```bash
 # Clone the repository
-git clone <repository-url>
-cd EaseWay
+git clone https://github.com/ranjeet-e/iLoveSwap.git
+cd iLoveSwap
 
 # Install dependencies
 npm install
 
-# Start the development server
+# Start the local development server
 npm run dev
 ```
 Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ---
 
-## Production Build & Preview
+## 📦 Production Build
 
 ```bash
-# Generate production bundle in dist/
+# Create production build in dist/
 npm run build
 
 # Preview production build locally
@@ -99,43 +116,25 @@ npm run preview
 
 ---
 
-## Deployment Guide
+## 🧩 Running as a Chrome Extension
 
-### Deploy to GitHub Pages (Automatic)
-The repository includes a ready-to-run GitHub Actions workflow (`.github/workflows/deploy.yml`).
-1. Push your code to GitHub on the `main` branch.
-2. In your GitHub repository, navigate to **Settings** > **Pages**.
-3. Under **Build and deployment** > **Source**, select **GitHub Actions**.
-4. The deployment workflow will trigger automatically upon every push.
-
-### Deploy to Vercel
-1. Install the Vercel CLI: `npm i -g vercel` or connect via the [Vercel Dashboard](https://vercel.com).
-2. The included `vercel.json` automatically configures Vite SPA routes and static outputs.
-3. Run:
-```bash
-vercel
-```
-
-### Deploy to Netlify
-1. Connect via the [Netlify Dashboard](https://app.netlify.com) or run `netlify deploy`.
-2. The included `netlify.toml` handles build commands and SPA redirect handling.
-
----
-
-## Loading as a Chrome Extension
-
-1. Build the production files:
-   ```bash
-   npm run build
-   ```
-2. Open Google Chrome (or any Chromium browser like Brave, Edge, Opera).
+1. Run `npm run build` to generate the production bundle in `dist/`.
+2. Open Google Chrome (or any Chromium browser like Brave, Edge, or Opera).
 3. Navigate to `chrome://extensions/`.
-4. Turn on the **Developer mode** toggle in the top-right corner.
-5. Click **Load unpacked** in the top-left corner.
-6. Select the `dist/` folder inside this project directory.
-7. The **iLoveSwap** icon will appear in your browser toolbar ready to use!
+4. Enable **Developer mode** via the top-right toggle.
+5. Click **Load unpacked** and select the `dist/` directory.
+6. The **iLoveSwap** extension icon will appear in your browser toolbar.
 
 ---
 
-## License
-ISC
+## 👤 Author & Maintainer
+
+**Ranjeet Epili**
+- GitHub: [@ranjeet-e](https://github.com/ranjeet-e)
+- Project: [iLoveSwap Repository](https://github.com/ranjeet-e/iLoveSwap)
+
+---
+
+## 📄 License
+
+ISC License. Distributed for legitimate educational and administrative productivity use.

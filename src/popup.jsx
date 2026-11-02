@@ -191,9 +191,14 @@ function PopupApp() {
         </button>
       </div>
 
-      <p className="text-[10px] text-center text-slate-400 mt-3 font-medium">
-        Bifurcate PDF sections, replace personal tags & export
-      </p>
+      <div className="mt-3 text-center space-y-1">
+        <p className="text-[10px] text-slate-500 font-medium">
+          Academic Document & Report Standardizer
+        </p>
+        <p className="text-[10px] text-slate-400">
+          Created with precision by <span className="font-semibold text-slate-600">Ranjeet Epili</span>
+        </p>
+      </div>
     </div>
   );
 }
