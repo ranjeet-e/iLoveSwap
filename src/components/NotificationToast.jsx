@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { X, Check } from 'lucide-react';
 
-export default function YuppyCelebration({ changes = [], onClose }) {
+export default function NotificationToast({ changes = [], onClose }) {
   useEffect(() => {
     const timer = setTimeout(() => {
       onClose?.();

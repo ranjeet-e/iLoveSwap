@@ -8,7 +8,7 @@ import PersonalTagsEditor from './components/PersonalTagsEditor';
 import SectionList from './components/SectionList';
 import PdfViewer from './components/PdfViewer';
 import ExportBar from './components/ExportBar';
-import YuppyCelebration from './components/YuppyCelebration';
+import NotificationToast from './components/NotificationToast';
 import ExtensionGuideModal from './components/ExtensionGuideModal';
 import FixedIdentityModal, { getSavedFixedIdentity } from './components/FixedIdentityModal';
 
@@ -63,8 +63,8 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState('');
   const [isExporting, setIsExporting] = useState(false);
-  const [showCelebration, setShowCelebration] = useState(false);
-  const [celebrationChanges, setCelebrationChanges] = useState([]);
+  const [showToast, setShowToast] = useState(false);
+  const [toastChanges, setToastChanges] = useState([]);
   const [showGuideModal, setShowGuideModal] = useState(false);
 
   const activeDoc = documents[activeDocIndex] || null;
@@ -468,8 +468,8 @@ export default function App() {
         });
       }
 
-      setCelebrationChanges(diffs);
-      setShowCelebration(true);
+      setToastChanges(diffs);
+      setShowToast(true);
     } catch (err) {
       console.error('Error applying modifications:', err);
       alert('Could not update document: ' + err.message);
@@ -528,10 +528,10 @@ export default function App() {
       }
 
       setDocuments(updatedDocs);
-      setCelebrationChanges([
+      setToastChanges([
         { label: 'Identity applied', from: 'All documents', to: currentFixed.name },
       ]);
-      setShowCelebration(true);
+      setShowToast(true);
     } catch (err) {
       console.error('Batch apply failed:', err);
       alert('Batch apply failed: ' + err.message);
@@ -584,10 +584,10 @@ export default function App() {
         }
 
         setDocuments(updatedDocs);
-        setCelebrationChanges([
+        setToastChanges([
           { label: 'Fixed Identity', from: 'Saved', to: newFixed.name },
         ]);
-        setShowCelebration(true);
+        setShowToast(true);
       } catch (e) {
         console.error('Error saving fixed identity across documents:', e);
       } finally {
@@ -851,10 +851,10 @@ export default function App() {
       )}
 
       {/* Status Toast */}
-      {showCelebration && (
-        <YuppyCelebration
-          changes={celebrationChanges}
-          onClose={() => setShowCelebration(false)}
+      {showToast && (
+        <NotificationToast
+          changes={toastChanges}
+          onClose={() => setShowToast(false)}
         />
       )}
 
