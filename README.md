@@ -8,9 +8,6 @@ A high-performance web application and Chrome Extension designed for academic re
 
 ```
 EaseWay/
-├── .github/
-│   └── workflows/
-│       └── deploy.yml            # Automated GitHub Actions deployment to GitHub Pages
 ├── public/                       # Static public assets copied directly to dist/
 │   ├── icons/                    # Chrome extension icons (16px, 48px, 128px)
 │   ├── icon.svg                  # Vector application logo
