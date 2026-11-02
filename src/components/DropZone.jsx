@@ -4,7 +4,6 @@ import { isWordDocument } from '../utils/docxParser';
 
 export default function DropZone({
   onFilesSelected,
-  onLoadSample,
   isLoading,
   loadingStatus,
   fixedIdentity,
@@ -108,27 +107,14 @@ export default function DropZone({
             Supported formats: PDF, DOCX, DOC
           </p>
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isLoading}
-              type="button"
-              className="px-4 py-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded transition-colors"
-            >
-              Select Documents
-            </button>
-
-            <span className="text-xs text-gray-400">or</span>
-
-            <button
-              onClick={onLoadSample}
-              disabled={isLoading}
-              type="button"
-              className="px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded transition-colors"
-            >
-              Load Sample Document
-            </button>
-          </div>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isLoading}
+            type="button"
+            className="px-4 py-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded transition-colors"
+          >
+            Select Documents
+          </button>
 
           {isLoading && (
             <p className="mt-4 text-xs text-red-600 font-medium">

@@ -144,53 +144,7 @@ export default function App() {
     }
   };
 
-  // Load sample lab manual
-  const loadSamplePdf = async () => {
-    try {
-      setIsLoading(true);
-      setLoadingStatus('Loading sample lab manual...');
-      const res = await fetch('/sample_lab_manual.pdf');
-      const arrayBuffer = await res.arrayBuffer();
-      const masterBytes = new Uint8Array(arrayBuffer);
-
-      const parsed = await parseAndBifurcatePdf(clonePdfBytes(masterBytes));
-      let finalSections = parsed.sections;
-      let finalModBytes = clonePdfBytes(masterBytes);
-
-      const currentFixed = fixedIdentity || getSavedFixedIdentity();
-      if (currentFixed?.name && currentFixed.autoApply !== false) {
-        finalSections = applyFixedToSections(parsed.sections, currentFixed);
-        try {
-          const modBytes = await applyPdfModifications(clonePdfBytes(masterBytes), finalSections);
-          finalModBytes = clonePdfBytes(modBytes);
-        } catch (e) {
-          console.error(e);
-        }
-      }
-
-      const sampleDoc = {
-        id: `doc_sample_${Date.now()}`,
-        fileName: 'Shah_Anchor_Lab_Manual_Exp1.pdf',
-        originalBytes: clonePdfBytes(masterBytes),
-        modifiedBytes: finalModBytes,
-        numPages: parsed.numPages,
-        sections: finalSections,
-        customReplacements: [],
-      };
-
-      setDocuments([sampleDoc]);
-      setActiveDocIndex(0);
-      setCurrentPage(1);
-    } catch (err) {
-      console.error('Error loading sample pdf:', err);
-      alert('Could not load sample PDF: ' + (err.message || 'Unknown error'));
-    } finally {
-      setIsLoading(false);
-      setLoadingStatus('');
-    }
-  };
-
-  // Process multiple uploaded PDFs
+  // Process multiple uploaded PDFs / Word DOCX documents
   const handleFilesSelected = async (files) => {
     if (!files || files.length === 0) return;
     try {
@@ -814,7 +768,6 @@ export default function App() {
     <div className="min-h-screen bg-gray-50 flex flex-col selection:bg-red-500 selection:text-white">
       {/* Top Navbar */}
       <Navbar
-        onLoadSample={loadSamplePdf}
         onReset={handleReset}
         onOpenGuide={() => setShowGuideModal(true)}
         onOpenFixedIdentity={() => setShowFixedIdentityModal(true)}
@@ -831,7 +784,6 @@ export default function App() {
         {documents.length === 0 ? (
           <DropZone
             onFilesSelected={handleFilesSelected}
-            onLoadSample={loadSamplePdf}
             isLoading={isLoading}
             loadingStatus={loadingStatus}
             fixedIdentity={fixedIdentity}

@@ -2,7 +2,6 @@ import React from 'react';
 import { RefreshCw, Puzzle, Shield } from 'lucide-react';
 
 export default function Navbar({
-  onLoadSample,
   onReset,
   onOpenGuide,
   onOpenFixedIdentity,
@@ -37,14 +36,6 @@ export default function Navbar({
           >
             <Shield className="w-3.5 h-3.5 text-gray-600" />
             <span>{fixedIdentity?.name ? `Identity: ${fixedIdentity.name}` : 'Fixed Identity'}</span>
-          </button>
-
-          <button
-            onClick={onLoadSample}
-            type="button"
-            className="px-3 py-1.5 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            Load Sample
           </button>
 
           {hasDocument && (
