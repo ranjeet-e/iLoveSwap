@@ -753,17 +753,6 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [pdfBuffer, sections, customReplacements, activeDocIndex]);
 
-  // Total sections count for active doc
-  const sectionsCount = sections
-    ? (sections.personalTags?.length || 0) +
-      (sections.headerLines?.length || 0) +
-      (sections.experimentSections?.length || 0) +
-      (sections.problemStatements?.length || 0) +
-      (sections.codeBlocks?.length || 0) +
-      (sections.outputSections?.length || 0) +
-      (sections.conclusionLines?.length || 0)
-    : 0;
-
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col selection:bg-red-500 selection:text-white">
       {/* Top Navbar */}
@@ -775,7 +764,6 @@ export default function App() {
         hasDocument={documents.length > 0}
         fileName={fileName}
         totalDocs={documents.length}
-        sectionsCount={sectionsCount}
         numPages={numPages}
       />
 

@@ -5,10 +5,6 @@ import {
   ExternalLink,
   Sparkles,
   User,
-  Hash,
-  Bookmark,
-  Users,
-  CheckCircle,
   Save,
   Zap,
 } from 'lucide-react';

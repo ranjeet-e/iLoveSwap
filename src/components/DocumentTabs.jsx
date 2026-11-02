@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Plus, X, Layers, ShieldCheck, FileText } from 'lucide-react';
+import { Plus, X, Layers, ShieldCheck } from 'lucide-react';
 import { isWordDocument } from '../utils/docxParser';
 
 export default function DocumentTabs({

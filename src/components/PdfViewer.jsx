@@ -7,7 +7,6 @@ import {
   ZoomOut,
   Edit3,
   Trash2,
-  RotateCcw,
   Check,
   X,
 } from 'lucide-react';
@@ -20,7 +19,6 @@ export default function PdfViewer({
   currentPage,
   onPageChange,
   numPages,
-  showOverlays = true,
   onSectionTextChange,
   onToggleRemoveItem,
   onApplyChanges,
@@ -296,15 +294,6 @@ export default function PdfViewer({
 
             const isHighlighted = highlightedItemId === (item.itemId || item.id);
             const isRemoved = !!item.isRemoved;
-            const displayText =
-              item.itemType === 'personal'
-                ? isRemoved
-                  ? ''
-                  : `${item.prefix || ''}${item.currentValue}`
-                : isRemoved
-                ? ''
-                : item.currentText;
-
             const isEditing = activeEditingItem?.id === item.id;
 
             return (

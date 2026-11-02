@@ -184,8 +184,6 @@ export async function parseAndBifurcatePdf(inputData) {
 
   // 2. Classify Remaining Items
   for (const page of rawPages) {
-    let currentCodeBlock = null;
-
     for (const item of page.items) {
       if (matchedItemIds.has(item.id)) continue;
 

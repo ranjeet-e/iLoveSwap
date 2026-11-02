@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Download, FileArchive, FileText } from 'lucide-react';
+import { FileArchive } from 'lucide-react';
 
 export default function ExportBar({
   onDownloadPdf,
