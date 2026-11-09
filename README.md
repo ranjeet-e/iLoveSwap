@@ -116,6 +116,30 @@ npm run preview
 
 ---
 
+## 🌐 Production Deployment Guide
+
+### Option 1: Cloudflare Pages (Recommended for High Traffic & Campus Networks)
+Cloudflare Pages provides unlimited bandwidth, zero edge request quota caps, and global DDoS mitigation.
+1. Connect your repository on the [Cloudflare Dashboard](https://dash.cloudflare.com/) > **Workers & Pages** > **Create application** > **Pages**.
+2. Set the build parameters:
+   - **Framework Preset**: `Vite`
+   - **Build command**: `npm run build`
+   - **Build output directory**: `dist`
+3. Single-page application routing is automatically handled via `public/_redirects`.
+
+### Option 2: GitHub Pages
+Deploy directly using the built-in deployment script:
+```bash
+npm run deploy
+```
+Live at: `https://ranjeet-e.github.io/iLoveSwap/`
+
+### Option 3: Vercel (Static Pure Frontend)
+1. Import repository at [vercel.com/new](https://vercel.com/new) with the `Vite` preset.
+2. `vercel.json` is configured purely for static assets with zero backend proxy rewrites, preventing edge quota depletion.
+
+---
+
 ## 🧩 Running as a Chrome Extension
 
 1. Run `npm run build` to generate the production bundle in `dist/`.
