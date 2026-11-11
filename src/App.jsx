@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { saveAs } from 'file-saver';
 import JSZip from 'jszip';
+import { FileText, Eye } from 'lucide-react';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import DropZone from './components/DropZone';
@@ -8,6 +9,7 @@ import DocumentTabs from './components/DocumentTabs';
 import PersonalTagsEditor from './components/PersonalTagsEditor';
 import SectionList from './components/SectionList';
 import PdfViewer from './components/PdfViewer';
+import WordDocumentEditor from './components/WordDocumentEditor';
 import ExportBar from './components/ExportBar';
 import ExtensionPage from './components/ExtensionPage';
 import NotificationToast from './components/NotificationToast';
@@ -16,6 +18,7 @@ import { downloadExtensionZip } from './utils/extensionDownloader';
 import { parseAndBifurcatePdf } from './utils/pdfParser';
 import { applyPdfModifications } from './utils/pdfModifier';
 import { exportToDocx } from './utils/docxExporter';
+import { convertPdfSectionsToDocxBytes } from './utils/docxConverter';
 import { clonePdfBytes } from './utils/pdfSetup';
 import { applyFixedToSections } from './utils/identityHelper';
 import {
@@ -67,6 +70,7 @@ export function computeDocName(sections, originalName, ext = '.pdf') {
 export default function App() {
   const [currentTab, setCurrentTab] = useState('home'); // 'home' | 'editor' | 'extension'
   const [editorFocus, setEditorFocus] = useState('all'); // 'all' | 'sections' | 'metadata'
+  const [activeViewMode, setActiveViewMode] = useState('word'); // 'word' | 'pdf'
 
   const [documents, setDocuments] = useState([]);
   const [activeDocIndex, setActiveDocIndex] = useState(0);
@@ -92,6 +96,21 @@ export default function App() {
   useEffect(() => {
     setCurrentPage(1);
   }, [activeDocIndex]);
+
+  // Update document state from Word Document Editor
+  const handleWordDocUpdated = ({ htmlContent, modifiedDocxBytes, modifiedPdfBytes }) => {
+    setDocuments((prev) =>
+      prev.map((doc, idx) => {
+        if (idx !== activeDocIndex) return doc;
+        return {
+          ...doc,
+          htmlContent,
+          modifiedDocxBytes: modifiedDocxBytes || doc.modifiedDocxBytes,
+          modifiedBytes: modifiedPdfBytes || doc.modifiedBytes,
+        };
+      })
+    );
+  };
 
   // Process a single file (PDF or DOCX) into document object
   const processFileToDoc = async (file) => {
@@ -126,10 +145,19 @@ export default function App() {
       const masterBytes = new Uint8Array(arrayBuffer);
       const parsed = await parseAndBifurcatePdf(clonePdfBytes(masterBytes));
 
+      let initialDocxBytes = null;
+      try {
+        initialDocxBytes = await convertPdfSectionsToDocxBytes(parsed.sections, file.name);
+      } catch (err) {
+        console.warn('Initial docx generation from pdf warning:', err);
+      }
+
       return {
         id: `doc_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
         fileName: file.name,
         docType: 'pdf',
+        originalDocxBytes: initialDocxBytes,
+        modifiedDocxBytes: initialDocxBytes,
         originalBytes: clonePdfBytes(masterBytes),
         modifiedBytes: clonePdfBytes(masterBytes),
         numPages: parsed.numPages,
@@ -563,30 +591,32 @@ export default function App() {
 
   // Download active document as Word (.docx)
   const handleDownloadDocx = async (customName) => {
-    if (!activeDoc || !sections) return;
+    if (!activeDoc) return;
     try {
       setIsExporting(true);
       const outName = customName.endsWith('.docx') ? customName : `${customName}.docx`;
 
-      if (activeDoc.docType === 'docx' && activeDoc.originalDocxBytes) {
-        let docxData = activeDoc.modifiedDocxBytes;
-        if (!docxData) {
-          docxData = await modifyDocxBytes(
-            activeDoc.originalDocxBytes,
-            sections,
-            customReplacements
-          );
-        }
-        if (docxData) {
-          const blob = new Blob([docxData], {
-            type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-          });
-          saveAs(blob, outName);
-          return;
+      let docxData = activeDoc.modifiedDocxBytes || activeDoc.originalDocxBytes;
+
+      if (!docxData && sections) {
+        try {
+          docxData = await convertPdfSectionsToDocxBytes(sections, outName);
+        } catch (e) {
+          console.warn('Docx conversion fallback:', e);
         }
       }
 
-      await exportToDocx(sections, outName);
+      if (docxData) {
+        const blob = new Blob([docxData], {
+          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        });
+        saveAs(blob, outName);
+        return;
+      }
+
+      if (sections) {
+        await exportToDocx(sections, outName);
+      }
     } catch (err) {
       console.error('Error exporting docx:', err);
       alert('Docx export error: ' + err.message);
@@ -721,88 +751,130 @@ export default function App() {
               isLoading={isLoading || isExporting}
             />
 
-            {/* Workflow Focus Sub-Tabs */}
-            <div className="flex items-center gap-2 mb-4 border-b border-gray-200 pb-2 text-xs font-semibold">
-              <span className="text-gray-400 uppercase tracking-wider text-[11px] mr-2">Focus:</span>
-              <button
-                type="button"
-                onClick={() => setEditorFocus('all')}
-                className={`px-3 py-1.5 rounded transition-colors cursor-pointer ${
-                  editorFocus === 'all'
-                    ? 'bg-gray-900 text-white'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                All Tools
-              </button>
-              <button
-                type="button"
-                onClick={() => setEditorFocus('sections')}
-                className={`px-3 py-1.5 rounded transition-colors cursor-pointer ${
-                  editorFocus === 'sections'
-                    ? 'bg-gray-900 text-white'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                Sections & Content
-              </button>
-              <button
-                type="button"
-                onClick={() => setEditorFocus('metadata')}
-                className={`px-3 py-1.5 rounded transition-colors cursor-pointer ${
-                  editorFocus === 'metadata'
-                    ? 'bg-gray-900 text-white'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                Document Metadata & Tags
-              </button>
+            {/* Primary Document Mode Selector */}
+            <div className="flex items-center justify-between mb-4 border-b border-gray-200 pb-3 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveViewMode('word')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md font-semibold text-xs cursor-pointer transition-colors ${
+                    activeViewMode === 'word'
+                      ? 'bg-red-600 text-white shadow-xs'
+                      : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Word Mode (Docx Editor)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveViewMode('pdf')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md font-semibold text-xs cursor-pointer transition-colors ${
+                    activeViewMode === 'pdf'
+                      ? 'bg-red-600 text-white shadow-xs'
+                      : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <Eye className="w-4 h-4" />
+                  <span>PDF Preview & Tools</span>
+                </button>
+              </div>
+
+              {activeViewMode === 'pdf' && (
+                <div className="flex items-center gap-2 text-xs font-semibold">
+                  <span className="text-gray-400 uppercase tracking-wider text-[11px] mr-1">Focus:</span>
+                  <button
+                    type="button"
+                    onClick={() => setEditorFocus('all')}
+                    className={`px-3 py-1.5 rounded transition-colors cursor-pointer ${
+                      editorFocus === 'all'
+                        ? 'bg-gray-900 text-white'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    All Tools
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditorFocus('sections')}
+                    className={`px-3 py-1.5 rounded transition-colors cursor-pointer ${
+                      editorFocus === 'sections'
+                        ? 'bg-gray-900 text-white'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    Sections & Content
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditorFocus('metadata')}
+                    className={`px-3 py-1.5 rounded transition-colors cursor-pointer ${
+                      editorFocus === 'metadata'
+                        ? 'bg-gray-900 text-white'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    Metadata & Tags
+                  </button>
+                </div>
+              )}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-              {/* Left Column: Sections & Tags Editor (7 Cols) */}
-              <div className="lg:col-span-7 space-y-6">
-                {/* Primary Metadata Tags Editor */}
-                {(editorFocus === 'all' || editorFocus === 'metadata') && (
-                  <PersonalTagsEditor
-                    personalTags={sections?.personalTags || []}
-                    onTagChange={handleTagChange}
-                    onAddTag={handleAddTag}
-                    onRemoveTag={handleRemoveTag}
-                    onToggleRemoveTag={handleToggleRemoveItem}
-                    onApplyChanges={handleApplyChanges}
-                    onHighlightItem={setHighlightedItemId}
-                  />
-                )}
+            {activeViewMode === 'word' ? (
+              <WordDocumentEditor
+                sections={sections}
+                fileName={fileName}
+                onSwitchToPdf={() => setActiveViewMode('pdf')}
+                onDocxUpdated={handleWordDocUpdated}
+                isExporting={isExporting}
+              />
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                {/* Left Column: Sections & Tags Editor (7 Cols) */}
+                <div className="lg:col-span-7 space-y-6">
+                  {/* Primary Metadata Tags Editor */}
+                  {(editorFocus === 'all' || editorFocus === 'metadata') && (
+                    <PersonalTagsEditor
+                      personalTags={sections?.personalTags || []}
+                      onTagChange={handleTagChange}
+                      onAddTag={handleAddTag}
+                      onRemoveTag={handleRemoveTag}
+                      onToggleRemoveTag={handleToggleRemoveItem}
+                      onApplyChanges={handleApplyChanges}
+                      onHighlightItem={setHighlightedItemId}
+                    />
+                  )}
 
-                {/* Bifurcated Sections Navigator */}
-                {(editorFocus === 'all' || editorFocus === 'sections') && (
-                  <SectionList
+                  {/* Bifurcated Sections Navigator */}
+                  {(editorFocus === 'all' || editorFocus === 'sections') && (
+                    <SectionList
+                      sections={sections}
+                      onSectionTextChange={handleSectionTextChange}
+                      onToggleRemoveItem={handleToggleRemoveItem}
+                      onHighlightItem={setHighlightedItemId}
+                      onAddCustomReplacement={handleAddCustomReplacement}
+                    />
+                  )}
+                </div>
+
+                {/* Right Column: Live PDF Document Canvas Viewer (5 Cols) */}
+                <div className="lg:col-span-5 sticky top-20">
+                  <PdfViewer
+                    pdfBuffer={modifiedPdfBuffer || pdfBuffer}
+                    originalPdfBuffer={pdfBuffer}
+                    highlightedItemId={highlightedItemId}
                     sections={sections}
+                    currentPage={currentPage}
+                    onPageChange={setCurrentPage}
+                    numPages={numPages}
                     onSectionTextChange={handleSectionTextChange}
                     onToggleRemoveItem={handleToggleRemoveItem}
-                    onHighlightItem={setHighlightedItemId}
-                    onAddCustomReplacement={handleAddCustomReplacement}
+                    onApplyChanges={handleApplyChanges}
+                    onSwitchToWordMode={() => setActiveViewMode('word')}
                   />
-                )}
+                </div>
               </div>
-
-              {/* Right Column: Live PDF Document Canvas Viewer (5 Cols) */}
-              <div className="lg:col-span-5 sticky top-20">
-                <PdfViewer
-                  pdfBuffer={modifiedPdfBuffer || pdfBuffer}
-                  originalPdfBuffer={pdfBuffer}
-                  highlightedItemId={highlightedItemId}
-                  sections={sections}
-                  currentPage={currentPage}
-                  onPageChange={setCurrentPage}
-                  numPages={numPages}
-                  onSectionTextChange={handleSectionTextChange}
-                  onToggleRemoveItem={handleToggleRemoveItem}
-                  onApplyChanges={handleApplyChanges}
-                />
-              </div>
-            </div>
+            )}
           </div>
         )}
       </main>

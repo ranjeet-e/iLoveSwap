@@ -102,13 +102,14 @@ function assembleVisualLines(rawItems, pageHeight) {
   if (valid.length === 0) return [];
 
   // 1. Sort all items from top to bottom (y descending in PDF coords)
+  // Use adaptive 6.5pt threshold so glyphs with slight baseline shift are grouped on the same line
   valid.sort((a, b) => {
     const yDiff = b.y - a.y;
-    if (Math.abs(yDiff) > 3.5) return yDiff;
+    if (Math.abs(yDiff) > 6.5) return yDiff;
     return a.x - b.x;
   });
 
-  // 2. Group items that share approximately the same baseline (tolerance 3.5 points)
+  // 2. Group items that share approximately the same baseline (tolerance 6.5 points)
   const lineClusters = [];
   let currentCluster = [];
   let clusterY = null;
@@ -117,7 +118,7 @@ function assembleVisualLines(rawItems, pageHeight) {
     if (clusterY === null) {
       currentCluster.push(item);
       clusterY = item.y;
-    } else if (Math.abs(item.y - clusterY) <= 3.5) {
+    } else if (Math.abs(item.y - clusterY) <= 6.5) {
       currentCluster.push(item);
     } else {
       lineClusters.push(currentCluster);
@@ -136,7 +137,7 @@ function assembleVisualLines(rawItems, pageHeight) {
     // Sort items horizontally from left to right
     cluster.sort((a, b) => a.x - b.x);
 
-    // Group items into segments (split if gap > 45px to support multi-column layouts)
+    // Group items into segments (split only if gap > 120px to support true multi-column layouts without breaking tabbed fields)
     let currentSegment = [];
 
     const flushSegment = (seg) => {
@@ -171,8 +172,8 @@ function assembleVisualLines(rawItems, pageHeight) {
           const currStartsSpace = /^\s/.test(it.str);
 
           if (!prevEndsSpace && !currStartsSpace) {
-            // If gap between bounding boxes > 1.8px, insert space; otherwise join cleanly
-            if (gap > 1.8) {
+            // If gap between bounding boxes > 1.2px, insert space; otherwise join cleanly
+            if (gap > 1.2) {
               fullStr += ' ' + it.str;
             } else {
               fullStr += it.str;
@@ -209,7 +210,7 @@ function assembleVisualLines(rawItems, pageHeight) {
         const prev = currentSegment[currentSegment.length - 1];
         const gap = it.x - (prev.x + prev.width);
 
-        if (gap > 45) {
+        if (gap > 120) {
           flushSegment(currentSegment);
           currentSegment = [it];
         } else {
@@ -265,16 +266,69 @@ export async function parseAndBifurcatePdf(inputData) {
     // Assemble lines
     const lines = assembleVisualLines(rawItems, viewport.height);
 
+    // Extract embedded images from page if in browser environment
+    const pageImages = [];
+    if (typeof document !== 'undefined' && document.createElement) {
+      try {
+        const ops = await page.getOperatorList();
+        for (let i = 0; i < ops.fnArray.length; i++) {
+          const fn = ops.fnArray[i];
+          if (fn === pdfjsLib.OPS.paintImageXObject || fn === pdfjsLib.OPS.paintInlineImageXObject) {
+            const imgName = ops.argsArray[i]?.[0];
+            if (imgName && page.objs?.get) {
+              try {
+                const imgObj = await new Promise((res) => {
+                  const timer = setTimeout(() => res(null), 400);
+                  page.objs.get(imgName, (data) => {
+                    clearTimeout(timer);
+                    res(data);
+                  });
+                });
+                if (imgObj && (imgObj.bitmap || imgObj.data)) {
+                  const imgCanvas = document.createElement('canvas');
+                  imgCanvas.width = imgObj.width || 120;
+                  imgCanvas.height = imgObj.height || 80;
+                  const ctx = imgCanvas.getContext('2d');
+                  if (imgObj.bitmap) {
+                    ctx.drawImage(imgObj.bitmap, 0, 0);
+                  } else if (imgObj.data) {
+                    const imgData = ctx.createImageData(imgObj.width, imgObj.height);
+                    imgData.data.set(imgObj.data);
+                    ctx.putImageData(imgData, 0, 0);
+                  }
+                  const dataUrl = imgCanvas.toDataURL('image/png');
+                  pageImages.push({
+                    id: `img_${pageNum}_${i}`,
+                    dataUrl,
+                    width: Math.min(imgObj.width || 250, 450),
+                    height: Math.min(imgObj.height || 150, 300),
+                    pageNum,
+                  });
+                }
+              } catch (e) {
+                // individual image skip
+              }
+            }
+          }
+        }
+      } catch (e) {
+        // operator list skip
+      }
+    }
+
     rawPages.push({
       pageNum,
       pageIndex: pageNum - 1,
       width: viewport.width,
       height: viewport.height,
       items: lines,
+      images: pageImages,
     });
 
     allExtractedLines.push(...lines);
   }
+
+  const allImages = rawPages.flatMap((p) => p.images || []);
 
   // Section Buckets
   const personalTags = [];
@@ -525,6 +579,7 @@ export async function parseAndBifurcatePdf(inputData) {
       outputSections,
       conclusionLines,
       otherLines,
+      images: allImages || [],
     },
     summary: {
       tagsFound: personalTags.length,

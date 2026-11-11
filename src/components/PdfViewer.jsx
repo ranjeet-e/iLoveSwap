@@ -22,6 +22,7 @@ export default function PdfViewer({
   onSectionTextChange,
   onToggleRemoveItem,
   onApplyChanges,
+  onSwitchToWordMode,
 }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -199,18 +200,18 @@ export default function PdfViewer({
           <button
             type="button"
             onClick={() => {
-              setIsWordMode(!isWordMode);
-              setActiveEditingItem(null);
+              if (onSwitchToWordMode) {
+                onSwitchToWordMode();
+              } else {
+                setIsWordMode(!isWordMode);
+                setActiveEditingItem(null);
+              }
             }}
-            className={`flex items-center gap-1.5 px-3 py-1 border rounded text-xs font-medium transition-colors ${
-              isWordMode
-                ? 'bg-red-600 border-red-600 text-white'
-                : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-            }`}
-            title="Click any text on the page to edit or remove it like Microsoft Word"
+            className="flex items-center gap-1.5 px-3 py-1 bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 rounded text-xs font-semibold transition-colors cursor-pointer"
+            title="Switch to full Word Mode (.docx) document editor"
           >
-            <Edit3 className="w-3.5 h-3.5" />
-            <span>{isWordMode ? 'Exit Word Mode' : 'Word Mode'}</span>
+            <Edit3 className="w-3.5 h-3.5 text-red-600" />
+            <span>Word Mode (.docx)</span>
           </button>
         </div>
 
