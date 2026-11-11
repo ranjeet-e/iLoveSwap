@@ -1,7 +1,7 @@
 {
   "name": "ilove-swap",
   "version": "1.0.0",
-  "description": "iLoveSwap - Academic Document Standardization & Formatting Utility by Ranjeet Epili",
+  "description": "iLoveSwap - Fast, private client-side document processing, section bifurcation, and editor",
   "main": "index.js",
   "scripts": {
     "dev": "vite",
@@ -10,12 +10,12 @@
     "deploy": "vite build && gh-pages -d dist"
   },
   "keywords": [
-    "academic-formatter",
+    "document-formatter",
     "pdf-editor",
     "docx-formatter",
-    "lab-manual-standardizer"
+    "section-bifurcator"
   ],
-  "author": "Ranjeet Epili",
+  "author": "",
   "license": "ISC",
   "type": "module",
   "dependencies": {

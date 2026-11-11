@@ -1,13 +1,11 @@
 import React, { useRef, useState } from 'react';
-import { Upload } from 'lucide-react';
+import { Upload, ShieldCheck } from 'lucide-react';
 import { isWordDocument } from '../utils/docxParser';
 
 export default function DropZone({
   onFilesSelected,
   isLoading,
   loadingStatus,
-  fixedIdentity,
-  onOpenFixedIdentityModal,
 }) {
   const fileInputRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -55,70 +53,72 @@ export default function DropZone({
     }
   };
 
+  const triggerUpload = () => {
+    fileInputRef.current?.click();
+  };
+
   return (
-    <div className="max-w-2xl mx-auto py-12 px-4">
-      <div className="text-center mb-8">
-        <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">
-          PDF & Word Document Editor
+    <div className="py-12 px-4 sm:px-6 max-w-4xl mx-auto">
+      {/* Hidden File Input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf, .docx, .doc, application/pdf, application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/msword"
+        multiple
+        className="hidden"
+        onChange={handleFileInputChange}
+      />
+
+      {/* Hero Title Section */}
+      <div className="text-center max-w-2xl mx-auto mb-8">
+        <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 tracking-tight">
+          Edit, redact, and transform PDF and Word documents
         </h1>
-        <p className="mt-2 text-sm text-gray-500">
-          Upload PDF or Word documents to extract sections, swap student details, and export.
+        <p className="mt-3 text-base text-gray-500 leading-relaxed">
+          100% free, private, and running entirely inside your browser.
         </p>
       </div>
 
-      {fixedIdentity?.name && (
-        <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded text-xs flex items-center justify-between text-gray-700">
-          <span>
-            Fixed Identity: <b>{fixedIdentity.name}</b> (Roll {fixedIdentity.rollNo || '-'}, {fixedIdentity.division || '-'})
-          </span>
-          <button
-            type="button"
-            onClick={onOpenFixedIdentityModal}
-            className="text-red-600 hover:underline"
-          >
-            Edit
-          </button>
-        </div>
-      )}
-
+      {/* Central iLovePDF-style Upload Target */}
       <div
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`border-2 border-dashed rounded-lg p-10 text-center transition-colors ${
-          isDragging ? 'border-red-500 bg-red-50/20' : 'border-gray-300 hover:border-gray-400'
+        className={`p-12 border-2 border-dashed rounded-xl bg-white transition-all text-center shadow-xs ${
+          isDragging
+            ? 'border-red-600 bg-red-50/40'
+            : 'border-gray-300 hover:border-gray-400'
         }`}
       >
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".pdf, .docx, .doc, application/pdf, application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/msword"
-          multiple
-          className="hidden"
-          onChange={handleFileInputChange}
-        />
-
         <div className="flex flex-col items-center justify-center">
-          <Upload className="w-8 h-8 text-gray-400 mb-3" />
-          <p className="text-sm font-medium text-gray-800">
-            Drag and drop your PDF or Word document(s) here
-          </p>
-          <p className="text-xs text-gray-500 mt-1 mb-5">
-            Supported formats: PDF, DOCX, DOC
-          </p>
-
           <button
-            onClick={() => fileInputRef.current?.click()}
+            onClick={triggerUpload}
             disabled={isLoading}
             type="button"
-            className="px-4 py-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded transition-colors"
+            className="px-8 py-3.5 bg-red-600 hover:bg-red-700 text-white font-bold text-base rounded shadow-xs transition-colors cursor-pointer flex items-center gap-2.5"
           >
-            Select Documents
+            <Upload className="w-5 h-5" />
+            <span>Select PDF or Word files</span>
           </button>
 
+          <p className="text-xs text-gray-500 mt-3 font-medium">
+            or drop PDF or Word documents here
+          </p>
+
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-2 text-[11px] text-gray-400">
+            <span className="px-2 py-0.5 rounded bg-gray-100 border border-gray-200 text-gray-600 font-mono font-medium">PDF</span>
+            <span className="px-2 py-0.5 rounded bg-gray-100 border border-gray-200 text-gray-600 font-mono font-medium">DOCX</span>
+            <span className="px-2 py-0.5 rounded bg-gray-100 border border-gray-200 text-gray-600 font-mono font-medium">DOC</span>
+            <span className="text-gray-300">|</span>
+            <span className="flex items-center gap-1 text-emerald-600 font-medium">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Zero server uploads (100% Client-Side)</span>
+            </span>
+          </div>
+
           {isLoading && (
-            <p className="mt-4 text-xs text-red-600 font-medium">
-              {loadingStatus || 'Processing documents...'}
+            <p className="mt-4 text-xs text-red-600 font-semibold animate-pulse">
+              {loadingStatus || 'Processing documents in browser memory...'}
             </p>
           )}
         </div>

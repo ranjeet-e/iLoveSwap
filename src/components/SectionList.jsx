@@ -58,38 +58,38 @@ export default function SectionList({
   const sectionDefs = [
     {
       key: 'header',
-      title: 'Header & Institution',
+      title: 'Headers & Organization Details',
       items: sections.headerLines || [],
     },
     {
       key: 'experiment',
-      title: 'Experiment & Aim',
+      title: 'Document Titles & Headings',
       items: sections.experimentSections || [],
     },
     {
       key: 'problem',
-      title: 'Problems & Questions',
+      title: 'Questions & Problem Statements',
       items: sections.problemStatements || [],
     },
     {
       key: 'code',
-      title: 'Code Blocks',
+      title: 'Code Blocks & Listings',
       items: sections.codeBlocks || [],
       isCode: true,
     },
     {
       key: 'output',
-      title: 'Output Captions',
+      title: 'Output Captions & Figures',
       items: sections.outputSections || [],
     },
     {
       key: 'conclusion',
-      title: 'Conclusion',
+      title: 'Conclusions & Remarks',
       items: sections.conclusionLines || [],
     },
     {
       key: 'other',
-      title: 'General Document Content',
+      title: 'Body Text & Paragraphs',
       items: sections.otherLines || [],
     },
   ];
@@ -125,7 +125,7 @@ export default function SectionList({
           <div className="flex gap-2">
             <input
               type="text"
-              placeholder="Text to insert (e.g. Approved by Teacher / Signature)..."
+              placeholder="Text to insert (e.g. Approved / Reviewed / Confidential)..."
               value={newCustomLine}
               onChange={(e) => setNewCustomLine(e.target.value)}
               className="flex-1 bg-white border border-gray-300 rounded px-2.5 py-1.5 focus:border-red-500 focus:outline-none"

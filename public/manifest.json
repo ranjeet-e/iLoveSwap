@@ -1,9 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "iLoveSwap - Academic Document Standardizer",
+  "name": "iLoveSwap - Document Editor & Section Bifurcator",
   "version": "1.0.0",
-  "description": "Academic document formatting and standardization tool for lab manuals and reports. Created by Ranjeet Epili.",
-  "author": "Ranjeet Epili",
+  "description": "Bifurcate PDF/Word sections, edit text in-place, and export clean documents.",
   "action": {
     "default_popup": "popup.html",
     "default_title": "iLoveSwap Quick Editor",

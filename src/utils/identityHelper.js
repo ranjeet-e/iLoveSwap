@@ -1,7 +1,7 @@
 /**
  * Updates composite fields like:
- * - "SYECS2 / 28 [BATCH - A]" -> "SYECS2 / 12 [BATCH - B1]"
- * - "28 / B1" -> "12 / B1"
+ * - "DEPT / 101 [GROUP - A]" -> "DEPT / 202 [GROUP - B]"
+ * - "101 / G1" -> "202 / G2"
  */
 export function updateCompositeTag(tagKey, originalVal, fixed) {
   if (!originalVal || !fixed) return originalVal;
@@ -9,27 +9,27 @@ export function updateCompositeTag(tagKey, originalVal, fixed) {
   if (tagKey === 'composite_roll_batch') {
     const m = originalVal.match(/^([a-zA-Z0-9_\-]+)\s*[\/&]\s*([a-zA-Z0-9_\-]+)/);
     if (m) {
-      const targetRoll = fixed.rollNo || m[1];
-      const targetBatch = fixed.batch || m[2];
+      const targetRoll = fixed.rollNo || fixed.referenceNo || m[1];
+      const targetBatch = fixed.batch || fixed.category || m[2];
       return `${targetRoll} / ${targetBatch}`;
     }
     return originalVal;
   }
 
-  // composite_class_roll (e.g. "SYECS2 / 28 [BATCH - A]" or "SYECS2 / 28")
-  const m1 = originalVal.match(/^([a-zA-Z0-9_\-]+)\s*[\/&]\s*([a-zA-Z0-9_\-]+)(?:\s*\[\s*(?:batch\s*[:\-–]?\s*)?([a-zA-Z0-9_\-]+)\s*\])?/i);
+  // composite_class_roll (e.g. "DEPT / 101 [GROUP - A]" or "DEPT / 101")
+  const m1 = originalVal.match(/^([a-zA-Z0-9_\-]+)\s*[\/&]\s*([a-zA-Z0-9_\-]+)(?:\s*\[\s*(?:(?:batch|group)\s*[:\-–]?\s*)?([a-zA-Z0-9_\-]+)\s*\])?/i);
   if (m1) {
     const origDiv = m1[1];
     const origRoll = m1[2];
     const origBatch = m1[3];
 
-    const targetDiv = fixed.division || origDiv;
-    const targetRoll = fixed.rollNo || origRoll;
-    const targetBatch = fixed.batch || origBatch;
+    const targetDiv = fixed.division || fixed.organization || origDiv;
+    const targetRoll = fixed.rollNo || fixed.referenceNo || origRoll;
+    const targetBatch = fixed.batch || fixed.category || origBatch;
 
     if (origBatch) {
-      const hasBatchPrefix = /batch\s*[:\-–]?/i.test(originalVal);
-      return `${targetDiv} / ${targetRoll} [${hasBatchPrefix ? 'BATCH - ' : ''}${targetBatch}]`;
+      const hasBatchPrefix = /(?:batch|group)\s*[:\-–]?/i.test(originalVal);
+      return `${targetDiv} / ${targetRoll} [${hasBatchPrefix ? 'GROUP - ' : ''}${targetBatch}]`;
     }
     return `${targetDiv} / ${targetRoll}`;
   }
@@ -38,7 +38,7 @@ export function updateCompositeTag(tagKey, originalVal, fixed) {
 }
 
 /**
- * Maps fixed identity properties across detected section personal tags.
+ * Maps default metadata properties across detected document tags.
  */
 export function applyFixedToSections(secList, fixed) {
   if (!fixed || !fixed.name || !secList?.personalTags) return secList;

@@ -56,7 +56,7 @@ export default function DocumentTabs({
               className="flex items-center gap-1 px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white font-medium rounded transition-colors text-xs"
             >
               <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Apply Fixed Identity to All</span>
+              <span>Apply Defaults to All</span>
             </button>
           )}
 

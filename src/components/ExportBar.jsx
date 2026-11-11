@@ -13,24 +13,38 @@ export default function ExportBar({
   const [fileName, setFileName] = useState('');
 
   useEffect(() => {
-    let nameVal = 'Student';
-    let rollVal = 'Roll';
-    let expVal = 'Exp1';
+    let nameVal = '';
+    let idVal = '';
+    let titleVal = '';
 
     if (sections?.personalTags) {
       sections.personalTags.forEach((tag) => {
         const k = (tag.key || tag.label || '').toLowerCase();
-        if (k.includes('name') && tag.currentValue) nameVal = tag.currentValue.replace(/\s+/g, '_');
-        if (k.includes('roll') && tag.currentValue) rollVal = tag.currentValue.replace(/\s+/g, '');
-        if (k.includes('exp') && tag.currentValue) expVal = tag.currentValue.replace(/\s+/g, '_');
+        if ((k.includes('author') || k.includes('name')) && tag.currentValue) {
+          nameVal = tag.currentValue.replace(/\s+/g, '_');
+        }
+        if ((k.includes('ref') || k.includes('id') || k.includes('code')) && tag.currentValue) {
+          idVal = tag.currentValue.replace(/\s+/g, '');
+        }
+        if ((k.includes('title') || k.includes('subject') || k.includes('doc')) && tag.currentValue) {
+          titleVal = tag.currentValue.replace(/\s+/g, '_');
+        }
       });
     }
 
-    if (defaultFileName && expVal === 'Exp1') {
-      const base = defaultFileName.replace(/\.pdf$/i, '');
-      setFileName(`${base}_Roll${rollVal}_${nameVal}`);
+    if (defaultFileName) {
+      const base = defaultFileName.replace(/\.(pdf|docx?)$/i, '');
+      if (nameVal && idVal) {
+        setFileName(`${base}_${nameVal}_${idVal}`);
+      } else if (nameVal) {
+        setFileName(`${base}_${nameVal}`);
+      } else {
+        setFileName(`${base}_Modified`);
+      }
+    } else if (titleVal) {
+      setFileName(`${titleVal}_Modified`);
     } else {
-      setFileName(`${expVal}_Roll${rollVal}_${nameVal}`);
+      setFileName('Document_Modified');
     }
   }, [sections, defaultFileName]);
 

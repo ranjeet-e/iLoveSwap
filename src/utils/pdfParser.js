@@ -1,20 +1,20 @@
 import { pdfjsLib, clonePdfBytes } from './pdfSetup.js';
 
 /**
- * Common patterns for Indian Engineering / University Lab Reports & Academic documents
+ * Document metadata and section identification patterns
  */
 export const TAG_REGEXES = [
-  { key: 'name', label: 'Name', regex: /^(?:student\s+)?name\s*[:\-–.]?\s*(.*)$/i },
-  { key: 'composite_class_roll', label: 'Class / Roll No / Batch', regex: /^(?:(?:class|division|div\.?)\s*(?:\/|&|\band\b)\s*roll\s*(?:no\.?|number)?|roll\s*(?:no\.?|number)?\s*(?:\/|&|\band\b)\s*(?:class|division|div\.?))\s*[:\-–.]?\s*(.*)$/i },
-  { key: 'composite_roll_batch', label: 'Roll No / Batch', regex: /^(?:roll\s*(?:no\.?|number)?\s*(?:\/|&|\band\b)\s*batch|batch\s*(?:\/|&|\band\b)\s*roll\s*(?:no\.?|number)?)\s*[:\-–.]?\s*(.*)$/i },
-  { key: 'rollNo', label: 'Roll No', regex: /^(?:roll\s*(?:no\.?|number)?)\s*[:\-–.]?\s*(.*)$/i },
-  { key: 'batch', label: 'Batch', regex: /^batch\s*[:\-–.]?\s*(.*)$/i },
-  { key: 'division', label: 'Division / Class', regex: /^(?:division|div\.?|class)\s*[:\-–.]?\s*(.*)$/i },
-  { key: 'prn', label: 'PRN / SAP ID', regex: /^(?:p\.?r\.?n\.?(?:\s*no\.?)?|sap\s*id\.?|uin\.?|reg(?:istration)?\.?\s*(?:no\.?)?)\s*[:\-–.]?\s*(.*)$/i },
-  { key: 'expNo', label: 'Experiment No', regex: /^(?:experiment|exp)\s*(?:no\.?|number)?\s*[:\-–.]?\s*(.*)$/i },
-  { key: 'date', label: 'Date', regex: /^(?:date(?:\s*of\s*submission)?)\s*[:\-–.]?\s*(.*)$/i },
-  { key: 'academicYear', label: 'Academic Year', regex: /^(?:a\.?y\.?|academic\s*year)\s*[:\-–.]?\s*(.*)$/i },
-  { key: 'subject', label: 'Subject / Course', regex: /^(?:subject|course)\s*[:\-–.]?\s*(.*)$/i },
+  { key: 'name', label: 'Author / Name', regex: /^(?:author|creator|prepared\s*by|submitted\s*by|student\s+)?name\s*[:\-–.]?\s*(.*)$/i },
+  { key: 'composite_class_roll', label: 'Department / Reference', regex: /^(?:(?:class|division|div\.?|department|dept\.?)\s*(?:\/|&|\band\b)\s*(?:roll|ref|id|no\.?|number)?|(?:roll|ref|id|no\.?|number)?\s*(?:\/|&|\band\b)\s*(?:class|division|div\.?|department|dept\.?))\s*[:\-–.]?\s*(.*)$/i },
+  { key: 'composite_roll_batch', label: 'ID / Batch', regex: /^(?:(?:roll|ref|id)\s*(?:no\.?|number)?\s*(?:\/|&|\band\b)\s*(?:batch|group)|(?:batch|group)\s*(?:\/|&|\band\b)\s*(?:roll|ref|id)\s*(?:no\.?|number)?)\s*[:\-–.]?\s*(.*)$/i },
+  { key: 'rollNo', label: 'Reference / ID', regex: /^(?:reference|ref\.?|roll\s*(?:no\.?|number)?|id\s*(?:no\.?|number)?)\s*[:\-–.]?\s*(.*)$/i },
+  { key: 'batch', label: 'Batch / Group', regex: /^(?:batch|group|cohort)\s*[:\-–.]?\s*(.*)$/i },
+  { key: 'division', label: 'Division / Department', regex: /^(?:division|div\.?|department|dept\.?|class)\s*[:\-–.]?\s*(.*)$/i },
+  { key: 'prn', label: 'Code / Identifier', regex: /^(?:p\.?r\.?n\.?(?:\s*no\.?)?|sap\s*id\.?|uin\.?|reg(?:istration)?\.?\s*(?:no\.?)?|doc\s*id|code)\s*[:\-–.]?\s*(.*)$/i },
+  { key: 'expNo', label: 'Document / Section No', regex: /^(?:document|doc|experiment|exp|chapter|section)\s*(?:no\.?|number)?\s*[:\-–.]?\s*(.*)$/i },
+  { key: 'date', label: 'Date', regex: /^(?:date(?:\s*of\s*(?:issue|submission|creation))?)\s*[:\-–.]?\s*(.*)$/i },
+  { key: 'academicYear', label: 'Version / Period', regex: /^(?:a\.?y\.?|version|ver\.?|period|year)\s*[:\-–.]?\s*(.*)$/i },
+  { key: 'subject', label: 'Title / Subject', regex: /^(?:title|subject|course|topic)\s*[:\-–.]?\s*(.*)$/i },
 ];
 
 /**
@@ -154,7 +154,7 @@ export async function parseAndBifurcatePdf(inputData) {
     }
   }
 
-  // Fallback: If no explicit personal tags were found by regex, scan for "TEJAS", "KAMBLE", or typical patterns
+  // Fallback: If no explicit tags were found, scan for key:value pairs
   if (personalTags.length === 0) {
     for (const item of allExtractedItems) {
       if (/name|roll|batch|div/i.test(item.str)) {
@@ -189,7 +189,7 @@ export async function parseAndBifurcatePdf(inputData) {
 
       const str = item.str.trim();
 
-      // Header: Top of Page 1 (e.g., college trust, college name, department)
+      // Header: Top of Page 1 (e.g., organization header, company name, department)
       if (page.pageNum === 1 && item.y > 680 && !/experiment/i.test(str)) {
         headerLines.push({
           id: `hdr_${item.id}`,

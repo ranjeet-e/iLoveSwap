@@ -117,7 +117,7 @@ export async function renderSectionsToPdf(sections) {
     currentY -= 8;
   }
 
-  // 3. Student Personal Details
+  // 3. Document Metadata Details
   if (sections.personalTags) {
     sections.personalTags.forEach((t) => {
       if (t.isRemoved) return;
@@ -301,10 +301,10 @@ export async function parseAndBifurcateDocx(arrayBuffer, fileName = 'document.do
 
     if (matchedTag) return;
 
-    // Institution / Header lines
+    // Organization / Header lines
     if (
       idx < 5 &&
-      /(?:college|university|institute|school|department|autonomous|engineering|technology)/i.test(line)
+      /(?:company|organization|institution|department|division|enterprise|engineering|technology)/i.test(line)
     ) {
       headerLines.push({
         id: `header_${itemId}`,

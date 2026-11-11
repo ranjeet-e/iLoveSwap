@@ -24,7 +24,7 @@ import { saveAs } from 'file-saver';
 export async function exportToDocx(sections, fileName = 'Document.docx') {
   const children = [];
 
-  // 1. Institution Header
+  // 1. Organization Header
   const activeHeaders = (sections.headerLines || []).filter(
     (h) => !h.isRemoved && (h.currentText || h.originalText)
   );
@@ -50,7 +50,7 @@ export async function exportToDocx(sections, fileName = 'Document.docx') {
     children.push(new Paragraph({ spacing: { after: 200 } }));
   }
 
-  // 2. Experiment / Project Title
+  // 2. Document / Project Title
   const activeExp = (sections.experimentSections || []).filter(
     (exp) => !exp.isRemoved && (exp.currentText || exp.originalText)
   );
@@ -76,7 +76,7 @@ export async function exportToDocx(sections, fileName = 'Document.docx') {
     children.push(new Paragraph({ spacing: { after: 240 } }));
   }
 
-  // 3. Student Identity Box / Table (Highlight section!)
+  // 3. Document Metadata & Details Table
   const activeTags = (sections.personalTags || []).filter(
     (t) => !t.isRemoved && (t.currentValue || t.originalValue)
   );
