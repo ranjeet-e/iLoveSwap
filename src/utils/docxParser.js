@@ -323,8 +323,8 @@ export async function parseAndBifurcateDocx(arrayBuffer, fileName = 'document.do
       return;
     }
 
-    // Experiment Title
-    if (/^(?:experiment|exp\.?)\s*(?:no\.?|number)?/i.test(line)) {
+    // Experiment / Document Title
+    if (/^(?:experiment|exp\.?|document|project)\s*(?:title|name|no\.?|number)?\s*[:\-–.]/i.test(line)) {
       experimentSections.push({
         id: `exp_${itemId}`,
         itemId,
@@ -342,8 +342,8 @@ export async function parseAndBifurcateDocx(arrayBuffer, fileName = 'document.do
       return;
     }
 
-    // Problem Statements / Questions
-    if (/^(?:question|problem|q\d+|aim|objective|task)/i.test(line)) {
+    // Problem Statements / Questions / Aim / Objectives
+    if (/^(?:question|problem|q\d+|aim|objective|objectives|task|problem\s*statement)\s*[:\-–.]?/i.test(line)) {
       problemStatements.push({
         id: `prob_${itemId}`,
         itemId,
@@ -357,6 +357,25 @@ export async function parseAndBifurcateDocx(arrayBuffer, fileName = 'document.do
         width: 400,
         height: 14,
         fontSize: 11,
+      });
+      return;
+    }
+
+    // Conclusions / Results / Inference
+    if (/^(?:conclusion|inference|result|summary|remarks?)\s*[:\-–.]?/i.test(line)) {
+      conclusionLines.push({
+        id: `concl_${itemId}`,
+        itemId,
+        category: 'conclusion',
+        originalText: line,
+        currentText: line,
+        pageNum: 1,
+        pageIndex: 0,
+        x: 60,
+        y: 500,
+        width: 400,
+        height: 14,
+        fontSize: 12,
       });
       return;
     }

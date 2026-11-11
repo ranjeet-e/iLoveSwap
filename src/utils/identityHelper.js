@@ -16,8 +16,8 @@ export function updateCompositeTag(tagKey, originalVal, fixed) {
     return originalVal;
   }
 
-  // composite_class_roll (e.g. "DEPT / 101 [GROUP - A]" or "DEPT / 101")
-  const m1 = originalVal.match(/^([a-zA-Z0-9_\-]+)\s*[\/&]\s*([a-zA-Z0-9_\-]+)(?:\s*\[\s*(?:(?:batch|group)\s*[:\-–]?\s*)?([a-zA-Z0-9_\-]+)\s*\])?/i);
+  // composite_class_roll (e.g. "DEPT / 101 [GROUP - A]" or "DEPT / 101" or "SYECS-2, 12")
+  const m1 = originalVal.match(/^([a-zA-Z0-9_\-]+)\s*[\/&,]\s*([a-zA-Z0-9_\-]+)(?:\s*\[\s*(?:(?:batch|group)\s*[:\-–]?\s*)?([a-zA-Z0-9_\-]+)\s*\])?/i);
   if (m1) {
     const origDiv = m1[1];
     const origRoll = m1[2];
@@ -31,7 +31,8 @@ export function updateCompositeTag(tagKey, originalVal, fixed) {
       const hasBatchPrefix = /(?:batch|group)\s*[:\-–]?/i.test(originalVal);
       return `${targetDiv} / ${targetRoll} [${hasBatchPrefix ? 'GROUP - ' : ''}${targetBatch}]`;
     }
-    return `${targetDiv} / ${targetRoll}`;
+    const sep = originalVal.includes(',') ? ', ' : ' / ';
+    return `${targetDiv}${sep}${targetRoll}`;
   }
 
   return originalVal;

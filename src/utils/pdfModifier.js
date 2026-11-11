@@ -52,14 +52,15 @@ export async function applyPdfModifications(originalPdfBuffer, sections, customR
       const fontSize = tag.fontSize || 12;
       const font = getFont(tag.fontName, true);
 
-      // Mask width must cover original text completely
+      // Mask width and height must cover original text completely
       const maskWidth = Math.max(tag.width + 25, newFullText.length * fontSize * 0.65 + 30);
-      const maskHeight = Math.max(tag.height + 4, fontSize + 4);
+      const maskHeight = Math.max(tag.height + 6, fontSize * 1.3);
+      const maskY = tag.y - Math.max(3, fontSize * 0.28);
 
       // Whiteout mask to erase old text
       page.drawRectangle({
         x: Math.max(tag.x - 2, 0),
-        y: tag.y - 3,
+        y: maskY,
         width: maskWidth,
         height: maskHeight,
         color: rgb(1, 1, 1),
@@ -95,13 +96,14 @@ export async function applyPdfModifications(originalPdfBuffer, sections, customR
       const font = fontOverride || getFont(item.fontName, isBold);
 
       const targetText = isRemoved ? '' : (item.currentText || '');
-      const maskWidth = Math.max(item.width + 20, targetText.length * fontSize * 0.65 + 20);
-      const maskHeight = Math.max(item.height + 4, fontSize + 4);
+      const maskWidth = Math.max(item.width + 25, targetText.length * fontSize * 0.65 + 25);
+      const maskHeight = Math.max(item.height + 6, fontSize * 1.3);
+      const maskY = item.y - Math.max(3, fontSize * 0.28);
 
       // Whiteout mask
       page.drawRectangle({
         x: Math.max(item.x - 2, 0),
-        y: item.y - 3,
+        y: maskY,
         width: maskWidth,
         height: maskHeight,
         color: rgb(1, 1, 1),
